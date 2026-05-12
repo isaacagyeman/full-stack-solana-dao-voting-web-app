@@ -3,20 +3,28 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: DAO Governance API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: daos
+    description: DAO operations
+  - name: proposals
+    description: Proposal operations
+  - name: votes
+    description: Vote operations
+  - name: stats
+    description: Statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,246 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /daos:
+    get:
+      operationId: listDaos
+      tags: [daos]
+      summary: List all DAOs
+      responses:
+        "200":
+          description: List of DAOs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dao"
+    post:
+      operationId: createDao
+      tags: [daos]
+      summary: Create a new DAO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DaoInput"
+      responses:
+        "201":
+          description: DAO created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dao"
+
+  /daos/{id}:
+    get:
+      operationId: getDao
+      tags: [daos]
+      summary: Get a DAO by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DAO details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dao"
+        "404":
+          description: Not found
+
+  /proposals:
+    get:
+      operationId: listProposals
+      tags: [proposals]
+      summary: List proposals
+      parameters:
+        - name: daoId
+          in: query
+          required: false
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: ["string", "null"]
+            enum: [active, pending, succeeded, defeated, executed, cancelled, null]
+      responses:
+        "200":
+          description: List of proposals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Proposal"
+    post:
+      operationId: createProposal
+      tags: [proposals]
+      summary: Create a new proposal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProposalInput"
+      responses:
+        "201":
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+
+  /proposals/{id}:
+    get:
+      operationId: getProposal
+      tags: [proposals]
+      summary: Get a proposal by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Proposal details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proposal"
+        "404":
+          description: Not found
+
+  /proposals/{id}/vote:
+    post:
+      operationId: castVote
+      tags: [votes]
+      summary: Cast a vote on a proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteInput"
+      responses:
+        "201":
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vote"
+        "400":
+          description: Invalid vote (already voted, proposal not active, etc.)
+
+  /proposals/{id}/votes:
+    get:
+      operationId: listVotesForProposal
+      tags: [votes]
+      summary: List votes for a proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of votes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Vote"
+
+  /proposals/{id}/my-vote/{walletAddress}:
+    get:
+      operationId: getMyVote
+      tags: [votes]
+      summary: Get a wallet's vote on a proposal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: walletAddress
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vote record or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteOrNull"
+        "404":
+          description: Not found
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get global DAO governance stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernanceStats"
+
+  /daos/{id}/stats:
+    get:
+      operationId: getDaoStats
+      tags: [stats]
+      summary: Get stats for a specific DAO
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: DAO stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DaoStats"
+
+  /activity:
+    get:
+      operationId: getRecentActivity
+      tags: [stats]
+      summary: Get recent governance activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +282,199 @@ components:
       required:
         - status
 
+    Dao:
+      type: object
+      required: [id, name, description, governanceToken, treasuryAddress, creatorAddress, totalProposals, totalMembers, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        governanceToken:
+          type: string
+        treasuryAddress:
+          type: string
+        creatorAddress:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        totalProposals:
+          type: integer
+        totalMembers:
+          type: integer
+        createdAt:
+          type: string
+
+    DaoInput:
+      type: object
+      required: [name, description, governanceToken, treasuryAddress, creatorAddress]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        governanceToken:
+          type: string
+        treasuryAddress:
+          type: string
+        creatorAddress:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+
+    Proposal:
+      type: object
+      required: [id, daoId, title, description, creatorAddress, status, votesFor, votesAgainst, votesAbstain, quorumRequired, startTime, endTime, createdAt]
+      properties:
+        id:
+          type: integer
+        daoId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        creatorAddress:
+          type: string
+        status:
+          type: string
+          enum: [active, pending, succeeded, defeated, executed, cancelled]
+        votesFor:
+          type: integer
+        votesAgainst:
+          type: integer
+        votesAbstain:
+          type: integer
+        quorumRequired:
+          type: integer
+        txSignature:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: string
+        createdAt:
+          type: string
+        daoName:
+          type: ["string", "null"]
+
+    ProposalInput:
+      type: object
+      required: [daoId, title, description, creatorAddress, quorumRequired, startTime, endTime]
+      properties:
+        daoId:
+          type: integer
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        creatorAddress:
+          type: string
+        quorumRequired:
+          type: integer
+        txSignature:
+          type: ["string", "null"]
+        startTime:
+          type: string
+        endTime:
+          type: string
+
+    Vote:
+      type: object
+      required: [id, proposalId, voterAddress, voteType, votingPower, createdAt]
+      properties:
+        id:
+          type: integer
+        proposalId:
+          type: integer
+        voterAddress:
+          type: string
+        voteType:
+          type: string
+          enum: [for, against, abstain]
+        votingPower:
+          type: integer
+        txSignature:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    VoteInput:
+      type: object
+      required: [voterAddress, voteType, votingPower]
+      properties:
+        voterAddress:
+          type: string
+        voteType:
+          type: string
+          enum: [for, against, abstain]
+        votingPower:
+          type: integer
+        txSignature:
+          type: ["string", "null"]
+
+    VoteOrNull:
+      type: object
+      properties:
+        vote:
+          oneOf:
+            - $ref: "#/components/schemas/Vote"
+            - type: "null"
+
+    GovernanceStats:
+      type: object
+      required: [totalDaos, totalProposals, totalVotes, activeProposals, totalVoters]
+      properties:
+        totalDaos:
+          type: integer
+        totalProposals:
+          type: integer
+        totalVotes:
+          type: integer
+        activeProposals:
+          type: integer
+        totalVoters:
+          type: integer
+
+    DaoStats:
+      type: object
+      required: [totalProposals, activeProposals, succeededProposals, defeatedProposals, totalVotes, uniqueVoters, participationRate]
+      properties:
+        totalProposals:
+          type: integer
+        activeProposals:
+          type: integer
+        succeededProposals:
+          type: integer
+        defeatedProposals:
+          type: integer
+        totalVotes:
+          type: integer
+        uniqueVoters:
+          type: integer
+        participationRate:
+          type: number
+
+    ActivityItem:
+      type: object
+      required: [id, type, description, walletAddress, createdAt]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [proposal_created, vote_cast, proposal_executed]
+        description:
+          type: string
+        walletAddress:
+          type: string
+        proposalId:
+          type: ["integer", "null"]
+        daoId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string

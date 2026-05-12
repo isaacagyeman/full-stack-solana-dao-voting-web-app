@@ -1,6 +1,6 @@
-# [Project name]
+# DAOvote
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A decentralized DAO governance platform built on Solana — connect your wallet, browse DAOs, create proposals, and cast on-chain votes with live results tracking.
 
 ## Run & Operate
 
@@ -14,6 +14,8 @@ _Replace the heading above with the project's name, and this line with one sente
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
+- Frontend: React + Vite + Tailwind CSS + shadcn/ui
+- Solana: @solana/wallet-adapter-react (Phantom + Solflare)
 - API: Express 5
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
@@ -22,23 +24,39 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/db/src/schema/index.ts` — DB schema (daos, proposals, votes, activity tables)
+- `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for all contracts)
+- `lib/api-client-react/src/generated/` — auto-generated React Query hooks + Zod schemas
+- `artifacts/api-server/src/routes/` — Express route handlers (daos, proposals, votes, stats)
+- `artifacts/dao-governance/src/pages/` — React pages (Home, DaoList, DaoDetail, ProposalList, ProposalDetail, CreateProposal)
+- `artifacts/dao-governance/src/lib/wallet.tsx` — Solana ConnectionProvider + WalletProvider (Phantom, Solflare)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Contract-first API: OpenAPI spec → Orval codegen → typed hooks used by both server (Zod validation) and client (React Query).
+- Wallet-gated actions: voting and proposal creation require a connected Solana wallet; wallet address stored as `voterAddress` / `creatorAddress` on each record.
+- Duplicate vote prevention: server enforces one vote per (proposalId, voterAddress) pair.
+- `zod/v3` used in `CreateProposal.tsx` form validation to avoid type conflict with `@hookform/resolvers` which bundles its own zod v3 types.
+- Solana RPC points to devnet; txSignature is stored but actual on-chain submission is optional (UI works without it).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Dashboard** — live stats (DAOs, proposals, votes, voters) + active proposal feed + recent activity
+- **DAO browser** — list all DAOs, drill into each for stats and filtered proposal list
+- **Proposals** — filterable list by status (active/pending/succeeded/defeated/executed)
+- **Proposal detail** — vote bar, countdown timer, For/Against/Abstain buttons, wallet-gated voting
+- **Create proposal** — wallet-gated form to submit a new governance proposal to any DAO
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Dark space theme (deep navy/slate background, purple accent)
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Do NOT import from `zod/v4` in files that use `@hookform/resolvers/zod` — use plain field-level validation instead (see CreateProposal.tsx).
+- Solana wallet adapters emit a `buffer` browser-compatibility warning in dev mode — harmless, suppressed by `global: "globalThis"` in vite.config.ts.
+- Run `pnpm run typecheck:libs` after editing any `lib/*` schema to rebuild declarations before typechecking artifacts.
+- Always run `pnpm --filter @workspace/api-spec run codegen` after changing `openapi.yaml`.
 
 ## Pointers
 
