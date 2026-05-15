@@ -49,7 +49,7 @@ A decentralized DAO governance platform built on Solana — connect your wallet,
 
 ## User preferences
 
-- Dark space theme (deep navy/slate background, purple accent)
+- Clean blue/white government-portal aesthetic (blue primary, white/light-gray backgrounds)
 
 ## Gotchas
 

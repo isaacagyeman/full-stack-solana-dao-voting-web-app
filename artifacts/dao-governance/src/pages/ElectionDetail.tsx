@@ -1,0 +1,357 @@
+import { useState } from "react";
+import { Link, useParams, useLocation } from "wouter";
+import { motion } from "framer-motion";
+import {
+  useGetElection,
+  useCastVote,
+  useGetMyVote,
+  usePublishElection,
+  useCloseElection,
+} from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
+import Navbar from "@/components/Navbar";
+import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  ChevronLeft,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  ShieldCheck,
+  BarChart3,
+  Lock,
+  Users,
+  Trophy,
+} from "lucide-react";
+
+type Candidate = { id: number; name: string; description?: string | null };
+type Election = {
+  id: number;
+  title: string;
+  description?: string | null;
+  type: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  maxChoices: number;
+  candidates?: Candidate[];
+  myRole?: string;
+  org?: { name: string; slug: string };
+};
+
+function timeLeft(end: string) {
+  const ms = new Date(end).getTime() - Date.now();
+  if (ms <= 0) return "Voting closed";
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (days > 0) return `${days}d ${hours}h remaining`;
+  if (hours > 0) return `${hours}h ${mins}m remaining`;
+  return `${mins}m remaining`;
+}
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+
+export default function ElectionDetail() {
+  const { slug, id } = useParams<{ slug: string; id: string }>();
+  const [, navigate] = useLocation();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const electionId = parseInt(id);
+
+  const [selected, setSelected] = useState<number[]>([]);
+  const [voteSuccess, setVoteSuccess] = useState<{ hash: string; sig: string } | null>(null);
+  const [voteError, setVoteError] = useState("");
+
+  const { data: election, isLoading } = useGetElection(electionId) as { data: Election | undefined; isLoading: boolean };
+  const { data: myVote } = useGetMyVote(electionId);
+
+  const castVoteMutation = useCastVote({
+    mutation: {
+      onSuccess(data) {
+        setVoteSuccess({ hash: (data as { voteHash: string }).voteHash, sig: (data as { txSignature: string }).txSignature });
+        qc.invalidateQueries();
+      },
+      onError(err: unknown) {
+        setVoteError((err as { data?: { error?: string } })?.data?.error ?? "Failed to cast vote");
+      },
+    },
+  });
+
+  const publishMutation = usePublishElection({
+    mutation: {
+      onSuccess() { qc.invalidateQueries(); },
+    },
+  });
+
+  const closeMutation = useCloseElection({
+    mutation: {
+      onSuccess() {
+        qc.invalidateQueries();
+        navigate(`/orgs/${slug}/elections/${electionId}/results`);
+      },
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+        <div className="max-w-3xl mx-auto px-4 py-10 animate-pulse space-y-4">
+          <div className="h-8 bg-slate-200 rounded w-64" />
+          <div className="h-4 bg-slate-200 rounded w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!election) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+        <div className="max-w-3xl mx-auto px-4 py-10 text-center">
+          <h2 className="text-xl font-bold text-slate-800">Election not found</h2>
+        </div>
+      </div>
+    );
+  }
+
+  const candidates = election.candidates ?? [];
+  const myRole = election.myRole ?? "voter";
+  const isAdmin = myRole === "admin";
+  const isOfficer = ["admin", "officer"].includes(myRole);
+  const hasVoted = !!(myVote as { hasVoted?: boolean })?.hasVoted || !!voteSuccess;
+  const isActive = election.status === "active";
+  const isDraft = election.status === "draft";
+  const isClosed = election.status === "closed";
+  const maxChoices = election.type === "single" || election.type === "yesno" ? 1 : (election.maxChoices ?? 1);
+
+  function toggleCandidate(cid: number) {
+    if (hasVoted || !isActive) return;
+    if (maxChoices === 1) {
+      setSelected([cid]);
+    } else {
+      setSelected((prev) =>
+        prev.includes(cid) ? prev.filter((x) => x !== cid) : prev.length < maxChoices ? [...prev, cid] : prev,
+      );
+    }
+  }
+
+  function handleVote() {
+    setVoteError("");
+    castVoteMutation.mutate({ id: electionId, data: { choices: selected } });
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
+
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+          <Link href={`/orgs/${slug}`}>
+            <button className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              {election.org?.name ?? "Back"}
+            </button>
+          </Link>
+
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className={`px-6 py-5 ${isActive ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white" : "bg-slate-50 border-b border-slate-100"}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isActive ? "bg-white/20 text-white" : isClosed ? "bg-slate-200 text-slate-600" : "bg-amber-100 text-amber-700"}`}>
+                  {election.status === "active" ? "● Live" : election.status === "draft" ? "Draft" : "Closed"}
+                </span>
+                <span className={`text-xs ${isActive ? "text-blue-100" : "text-slate-400"} capitalize`}>{election.type} choice</span>
+              </div>
+              <h1 className={`text-xl font-bold mb-1 ${isActive ? "text-white" : "text-slate-900"}`}>{election.title}</h1>
+              {election.description && (
+                <p className={`text-sm ${isActive ? "text-blue-100" : "text-slate-500"}`}>{election.description}</p>
+              )}
+              <div className={`flex items-center gap-4 mt-3 text-sm ${isActive ? "text-blue-100" : "text-slate-400"}`}>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4" />
+                  {isActive ? timeLeft(election.endTime) : isClosed ? `Ended ${formatDate(election.endTime)}` : `Opens ${formatDate(election.startTime)}`}
+                </span>
+                {isActive && (
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="w-4 h-4" />
+                    Your vote is private
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6">
+              {isDraft && isOfficer && (
+                <div className="mb-6 bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <p className="text-sm text-amber-700 mb-3">
+                    This election is in draft mode. Publish it to allow members to vote.
+                    {candidates.length < 2 && " Add at least 2 candidates before publishing."}
+                  </p>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                      disabled={candidates.length < 2 || publishMutation.isPending}
+                      onClick={() => publishMutation.mutate({ id: electionId })}
+                    >
+                      {publishMutation.isPending ? "Publishing…" : "Publish election"}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {isClosed && (
+                <div className="mb-6 flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl p-4">
+                  <p className="text-sm text-slate-600">This election is closed. View the final results.</p>
+                  <Link href={`/orgs/${slug}/elections/${electionId}/results`}>
+                    <Button size="sm" variant="outline">
+                      <BarChart3 className="w-4 h-4 mr-1.5" />
+                      View results
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {voteSuccess ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-8"
+                >
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="w-8 h-8 text-green-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Vote recorded!</h3>
+                  <p className="text-slate-500 text-sm mb-4">Your ballot has been securely recorded on the blockchain.</p>
+                  <div className="bg-slate-50 rounded-xl p-4 text-left space-y-2">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">Vote hash</p>
+                      <p className="text-xs font-mono text-slate-600 break-all">{voteSuccess.hash}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-0.5">Transaction signature</p>
+                      <p className="text-xs font-mono text-slate-600 break-all">{voteSuccess.sig}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : hasVoted ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                    <ShieldCheck className="w-7 h-7 text-blue-600" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 mb-1">You've already voted</h3>
+                  <p className="text-slate-500 text-sm">Your vote has been securely recorded.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <h2 className="font-semibold text-slate-800 mb-1">
+                      {maxChoices === 1 ? "Select one option" : `Select up to ${maxChoices} options`}
+                    </h2>
+                    {!isActive && <p className="text-sm text-slate-500">Voting is not currently open.</p>}
+                  </div>
+
+                  {voteError && (
+                    <div className="mb-4 flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-sm">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      {voteError}
+                    </div>
+                  )}
+
+                  <div className="space-y-3 mb-6">
+                    {candidates.map((c, i) => {
+                      const isSelected = selected.includes(c.id);
+                      return (
+                        <motion.div
+                          key={c.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          onClick={() => toggleCandidate(c.id)}
+                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
+                            isSelected
+                              ? "border-blue-500 bg-blue-50 shadow-sm"
+                              : isActive
+                              ? "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
+                              : "border-slate-200 opacity-60 cursor-not-allowed"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                  isSelected ? "border-blue-500 bg-blue-500" : "border-slate-300"
+                                }`}
+                              >
+                                {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-slate-900">{c.name}</p>
+                                {c.description && (
+                                  <p className="text-sm text-slate-500 mt-0.5">{c.description}</p>
+                                )}
+                              </div>
+                            </div>
+                            {isSelected && <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  {isActive && (
+                    <div className="space-y-3">
+                      <Button
+                        onClick={handleVote}
+                        disabled={selected.length === 0 || castVoteMutation.isPending}
+                        className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                      >
+                        {castVoteMutation.isPending ? "Submitting…" : "Submit my vote"}
+                      </Button>
+                      <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1">
+                        <Lock className="w-3.5 h-3.5" />
+                        Your identity is not linked to your ballot
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {isClosed && isAdmin && (
+                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate(`/orgs/${slug}/elections/${electionId}/results`)}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-1.5" />
+                    Full results & audit
+                  </Button>
+                </div>
+              )}
+
+              {isActive && isAdmin && (
+                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    disabled={closeMutation.isPending}
+                    onClick={() => closeMutation.mutate({ id: electionId })}
+                  >
+                    {closeMutation.isPending ? "Closing…" : "Close election early"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </main>
+    </div>
+  );
+}

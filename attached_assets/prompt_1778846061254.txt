@@ -1,0 +1,323 @@
+You are a senior full-stack engineer, blockchain architect, and UX designer.
+Build a production-grade decentralized voting and election platform that looks and feels like a modern, mainstream voting SaaS application (like Google Forms + SurveyMonkey + government voting portals), but is powered by Solana blockchain for transparency, auditability, and tamper-proof results.
+The blockchain layer must be completely hidden from normal users.
+
+---
+
+ CORE PRODUCT VISION
+
+This is NOT a crypto app.
+
+It is a trusted digital election infrastructure system for:
+
+- Schools
+- Universities
+- Churches
+- Communities
+- Companies
+- DAOs
+- Organizations
+- Public/private polls
+
+Users should experience it as a simple voting platform:
+
+«Sign up → join organization → vote → see results»
+
+---
+
+ TECH STACK
+
+Blockchain Layer
+
+- Solana
+- Anchor Framework (Rust)
+
+Backend
+
+- Node.js + Express
+- PostgreSQL or MongoDB
+
+Frontend
+
+- React (latest)
+- Tailwind CSS
+- Framer Motion
+- Chart.js or Recharts
+
+Authentication
+
+- Email/password auth
+- OTP (email or SMS verification)
+- JWT sessions
+
+Optional:
+
+- Wallet integration (hidden advanced mode only)
+
+---
+
+ SYSTEM DESIGN REQUIREMENTS
+
+Multi-Tenant System
+
+Support multiple organizations:
+
+Each organization has:
+
+- Admins
+- Election officers
+- Voters
+- Observers
+
+Each organization can:
+
+- Create polls/elections
+- Invite members
+- Manage roles
+- View analytics
+
+---
+
+ IDENTITY & SECURITY (CRITICAL)
+
+Implement strong identity system:
+
+User Verification Levels:
+
+- Level 1: Email verified
+- Level 2: Phone verified (OTP)
+- Level 3: Organization verified member
+- Level 4: Admin verified identity (optional)
+
+Prevent:
+
+- Duplicate accounts
+- Fake voting
+- Multiple votes per user
+
+---
+
+ VOTING SYSTEM FEATURES
+
+Voting Types:
+
+- Single choice vote
+- Multi-choice vote
+- Ranked choice voting
+- Yes/No polls
+- Weighted voting (optional DAO mode)
+
+Voting Rules:
+
+- One user = one vote per election
+- Votes are immutable once submitted
+- Voting closes at deadline automatically
+
+---
+
+ RESULTS & TRANSPARENCY
+
+Must include:
+
+- Real-time vote updates
+- Bar charts / pie charts
+- Turnout percentage
+- Winner highlighting
+- Voting history per election
+
+Blockchain Audit Layer:
+
+- Public verification page
+- Hash-based vote integrity proof
+- Election audit trail explorer
+- “Verify results” button
+
+Users should be able to confirm:
+
+«“This election has not been tampered with”»
+
+---
+
+ ORGANIZATION FEATURES
+
+Each organization includes:
+
+- Dashboard
+- Member management
+- Role assignment
+- Election creation tools
+- Analytics dashboard
+- Private/public elections
+
+---
+
+ FRONTEND REQUIREMENTS
+
+Pages:
+
+Public
+
+- Landing page (professional SaaS design)
+- Login
+- Signup
+
+User Dashboard
+
+- Active elections
+- Past elections
+- Results
+- Profile
+
+Organization Dashboard
+
+- Create election
+- Manage members
+- View analytics
+
+Voting Interface
+
+- Simple candidate cards
+- Big “Vote” buttons
+- Confirmation modal
+- No technical language
+
+---
+
+ UX DESIGN REQUIREMENTS (VERY IMPORTANT)
+
+The UI must feel like:
+
+- Government voting system
+- Google Forms simplicity
+- Modern SaaS dashboard
+
+NOT crypto.
+
+Avoid:
+
+- Wallets
+- Blockchain terms
+- Technical jargon
+
+Use simple labels:
+
+- “Vote Now”
+- “Submit Vote”
+- “Election Results”
+- “Create Poll”
+
+---
+
+ BLOCKCHAIN REQUIREMENTS (HIDDEN LAYER)
+
+All votes must be stored on Solana:
+
+- Each vote is written on-chain
+- Use PDA to prevent duplicate votes:
+  seeds = ["vote", user_id, election_id]
+- Election results derived from on-chain data
+- Immutable audit trail
+
+BUT:
+
+- Users should never interact directly with blockchain
+- Blockchain is only backend integrity layer
+
+---
+
+ SMART CONTRACT DESIGN (ANCHOR)
+
+Accounts:
+
+- Election
+- VoteRecord
+- Organization
+- UserIdentity
+
+Instructions:
+
+- create_election
+- cast_vote
+- close_election
+- register_user
+
+---
+
+ MOBILE-FIRST DESIGN
+
+- Fully responsive
+- PWA support
+- Fast loading
+- Low-bandwidth mode
+
+---
+
+ ANALYTICS FEATURES
+
+Include:
+
+- Real-time turnout tracking
+- Participation analytics
+- Demographic breakdown (if available)
+- Voting trends over time
+
+---
+
+ AI FEATURES (OPTIONAL BUT HIGH VALUE)
+
+- Detect suspicious voting patterns
+- Summarize election results automatically
+- Generate insights from voting data
+- Fraud anomaly detection
+
+---
+
+ PROJECT STRUCTURE
+
+Generate full production structure:
+
+/frontend
+/backend
+/programs (Anchor)
+/database
+/middleware
+/controllers
+/routes
+/services
+/tests
+/config
+
+---
+
+ DEPLOYMENT REQUIREMENTS
+
+Include:
+
+- Solana devnet setup
+- Backend deployment guide
+- Frontend deployment guide
+- Environment variables
+- Full README documentation
+
+---
+
+ STRICT OUTPUT RULES
+
+- Generate full working code (not partial snippets)
+- No placeholder-only files
+- No missing features
+- Ensure system runs after installation
+- Include comments for clarity
+- Ensure security best practices
+
+---
+
+ FINAL GOAL
+
+Build a production-ready decentralized election platform that:
+
+- Feels like a normal voting SaaS product
+- Works for real institutions
+- Uses Solana blockchain invisibly for trust
+- Supports authentication, organizations, elections, voting, and auditability
+- Is scalable to real-world use cases (schools, companies, communities, DAOs)

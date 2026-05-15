@@ -1,16 +1,14 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
-import daosRouter from "./daos";
-import proposalsRouter from "./proposals";
-import votesRouter from "./votes";
-import statsRouter from "./stats";
+import authRouter from "./auth";
+import organizationsRouter from "./organizations";
+import electionsRouter from "./elections";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use(daosRouter);
-router.use(proposalsRouter);
-router.use(votesRouter);
-router.use(statsRouter);
+router.use(authRouter);
+router.use(organizationsRouter);
+router.use(electionsRouter);
 
 export default router;

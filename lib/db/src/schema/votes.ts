@@ -1,17 +1,14 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import { pgTable, serial, integer, varchar, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { elections } from "./elections";
+import { users } from "./users";
 
-export const votesTable = pgTable("votes", {
+export const votes = pgTable("votes", {
   id: serial("id").primaryKey(),
-  proposalId: integer("proposal_id").notNull(),
-  voterAddress: text("voter_address").notNull(),
-  voteType: text("vote_type").notNull(),
-  votingPower: integer("voting_power").notNull().default(1),
-  txSignature: text("tx_signature"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  electionId: integer("election_id").references(() => elections.id).notNull(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  choices: jsonb("choices").notNull().$type<number[]>(),
+  voteHash: varchar("vote_hash", { length: 64 }).notNull(),
+  txSignature: varchar("tx_signature", { length: 88 }),
+  blockHeight: integer("block_height"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-export const insertVoteSchema = createInsertSchema(votesTable).omit({ id: true, createdAt: true });
-export type InsertVote = z.infer<typeof insertVoteSchema>;
-export type Vote = typeof votesTable.$inferSelect;
