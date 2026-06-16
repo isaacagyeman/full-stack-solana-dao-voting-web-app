@@ -69,6 +69,18 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // In Replit the shared reverse proxy routes /api → API server at the
+    // network layer, so this proxy block is never reached there.
+    // Locally it forwards /api requests from the Vite dev server to the
+    // running API server so the browser never hits a CORS wall.
+    ...(process.env.REPL_ID === undefined && {
+      proxy: {
+        "/api": {
+          target: `http://localhost:${process.env.API_PORT ?? "8080"}`,
+          changeOrigin: true,
+        },
+      },
+    }),
   },
   preview: {
     port,
