@@ -248,6 +248,29 @@ The app is **contract-first**: the OpenAPI spec at `lib/api-spec/openapi.yaml` i
 
 ## Troubleshooting
 
+**Windows: `Missing lightningcss.win32-x64-msvc.node` binary (frontend won't start)**
+
+The lockfile was generated on Linux (Replit), so it doesn't include the Windows-specific native binary for `lightningcss` (used internally by `@tailwindcss/vite`). Fix:
+
+```powershell
+# Step 1 — delete node_modules (contains Linux binaries)
+Remove-Item -Recurse -Force node_modules   # PowerShell
+# rmdir /s /q node_modules                 # cmd.exe alternative
+
+# Step 2 — reinstall (pnpm detects Windows and fetches the correct binary)
+pnpm install
+```
+
+If the error still appears after reinstalling:
+```bash
+# Force-add lightningcss directly so pnpm resolves the Windows binary explicitly
+pnpm add -D lightningcss -w
+```
+
+Then start the frontend as normal: `PORT=5173 BASE_PATH=/ pnpm --filter @workspace/dao-governance run dev`
+
+---
+
 **`DATABASE_URL` not found error on startup**
 → Make sure you exported the env var or the `.env` file is in the project root and sourced before running.
 
