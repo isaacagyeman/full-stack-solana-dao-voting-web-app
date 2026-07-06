@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -50,6 +50,15 @@ function timeLeft(end: string) {
   return `${mins}m remaining`;
 }
 
+function countdownParts(start: string) {
+  const ms = Math.max(0, new Date(start).getTime() - Date.now());
+  const days = Math.floor(ms / 86400000);
+  const hours = Math.floor((ms % 86400000) / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return { days, hours, mins, secs };
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-US", {
     month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
@@ -66,6 +75,12 @@ export default function ElectionDetail() {
   const [selected, setSelected] = useState<number[]>([]);
   const [voteSuccess, setVoteSuccess] = useState<{ hash: string; sig: string } | null>(null);
   const [voteError, setVoteError] = useState("");
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: election, isLoading } = useGetElection(electionId) as { data: Election | undefined; isLoading: boolean };
   const { data: myVote } = useGetMyVote(electionId);
@@ -128,6 +143,7 @@ export default function ElectionDetail() {
   const isActive = election.status === "active";
   const isDraft = election.status === "draft";
   const isClosed = election.status === "closed";
+  const isUpcoming = isActive && now < new Date(election.startTime).getTime();
   const maxChoices = election.type === "single" || election.type === "yesno" ? 1 : (election.maxChoices ?? 1);
 
   function toggleCandidate(cid: number) {
@@ -174,7 +190,13 @@ export default function ElectionDetail() {
               <div className={`flex items-center gap-4 mt-3 text-sm ${isActive ? "text-blue-100" : "text-slate-400"}`}>
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-4 h-4" />
-                  {isActive ? timeLeft(election.endTime) : isClosed ? `Ended ${formatDate(election.endTime)}` : `Opens ${formatDate(election.startTime)}`}
+                  {isUpcoming
+                    ? `Voting opens ${formatDate(election.startTime)}`
+                    : isActive
+                    ? timeLeft(election.endTime)
+                    : isClosed
+                    ? `Ended ${formatDate(election.endTime)}`
+                    : `Opens ${formatDate(election.startTime)}`}
                 </span>
                 {isActive && (
                   <span className="flex items-center gap-1.5">
@@ -246,6 +268,17 @@ export default function ElectionDetail() {
                   </div>
                   <h3 className="font-bold text-slate-900 mb-1">You've already voted</h3>
                   <p className="text-slate-500 text-sm">Your vote has been securely recorded.</p>
+                </div>
+              ) : isUpcoming ? (
+                <div className="py-6 text-center">
+                  <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                    <Clock className="w-7 h-7 text-blue-600" />
+                  </div>
+                  <h3 className="font-bold text-slate-900 mb-1">Voting hasn't opened yet</h3>
+                  <p className="text-slate-500 text-sm mb-6">
+                    Candidates will be revealed when voting begins on {formatDate(election.startTime)}.
+                  </p>
+                  <CountdownTimer target={election.startTime} now={now} />
                 </div>
               ) : (
                 <>
@@ -352,6 +385,27 @@ export default function ElectionDetail() {
           </div>
         </motion.div>
       </main>
+    </div>
+  );
+}
+
+function CountdownTimer({ target, now }: { target: string; now: number }) {
+  const { days, hours, mins, secs } = countdownParts(target);
+  void now;
+  const units = [
+    { label: "Days", value: days },
+    { label: "Hours", value: hours },
+    { label: "Min", value: mins },
+    { label: "Sec", value: secs },
+  ];
+  return (
+    <div className="flex items-center justify-center gap-3">
+      {units.map((u) => (
+        <div key={u.label} className="bg-blue-50 rounded-xl px-4 py-3 min-w-[64px]">
+          <p className="text-2xl font-bold text-blue-700 tabular-nums">{String(u.value).padStart(2, "0")}</p>
+          <p className="text-[11px] font-medium text-blue-400 uppercase tracking-wide mt-0.5">{u.label}</p>
+        </div>
+      ))}
     </div>
   );
 }
