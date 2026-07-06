@@ -27,6 +27,7 @@ export async function seedIfEmpty() {
     .values({
       name: "Springfield School District",
       slug: "springfield-school",
+      accessCode: "SPRING01",
       description: "Official governance portal for Springfield School District elections and referendums.",
       isPublic: true,
       ownerId: admin.id,

@@ -5,6 +5,7 @@ export const organizations = pgTable("organizations", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 100 }).unique().notNull(),
+  accessCode: varchar("access_code", { length: 20 }).unique().notNull(),
   description: text("description"),
   logoUrl: varchar("logo_url", { length: 500 }),
   isPublic: boolean("is_public").default(true).notNull(),

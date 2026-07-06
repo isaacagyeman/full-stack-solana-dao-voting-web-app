@@ -5,6 +5,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).unique().notNull(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
+  role: varchar("role", { length: 20 }).default("voter").notNull(),
   phone: varchar("phone", { length: 50 }),
   emailVerified: boolean("email_verified").default(true).notNull(),
   phoneVerified: boolean("phone_verified").default(false).notNull(),

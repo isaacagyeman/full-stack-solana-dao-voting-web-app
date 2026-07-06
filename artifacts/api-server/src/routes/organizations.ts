@@ -1,9 +1,20 @@
 import { Router } from "express";
+import { randomBytes } from "crypto";
 import { db, users, organizations, orgMembers, elections } from "@workspace/db";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 
 const router = Router();
+
+function generateAccessCode(length = 8): string {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let result = "";
+  const bytes = randomBytes(length);
+  for (let i = 0; i < length; i++) {
+    result += alphabet[bytes[i] % alphabet.length];
+  }
+  return result;
+}
 
 async function enrichOrg(
   org: typeof organizations.$inferSelect,
@@ -45,6 +56,10 @@ router.get("/organizations", requireAuth, async (req, res) => {
 
 router.post("/organizations", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
+  if (req.user!.role !== "organizer") {
+    res.status(403).json({ error: "Only election organizers can create organizations" });
+    return;
+  }
   const { name, description, isPublic } = req.body as {
     name?: string;
     description?: string;
@@ -61,9 +76,10 @@ router.post("/organizations", requireAuth, async (req, res) => {
       .replace(/^-|-$/g, "") +
     "-" +
     Date.now().toString(36);
+  const accessCode = generateAccessCode();
   const [org] = await db
     .insert(organizations)
-    .values({ name, slug, description, isPublic: isPublic ?? true, ownerId: uid })
+    .values({ name, slug, accessCode, description, isPublic: isPublic ?? true, ownerId: uid })
     .returning();
   await db.insert(orgMembers).values({ orgId: org.id, userId: uid, role: "admin" });
   res.status(201).json({ ...org, memberCount: 1, electionCount: 0, myRole: "admin" });
@@ -74,7 +90,7 @@ router.get("/organizations/:slug", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Organization not found" });
     return;
@@ -89,7 +105,7 @@ router.put("/organizations/:slug", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -115,14 +131,19 @@ router.put("/organizations/:slug", requireAuth, async (req, res) => {
   res.json(updated);
 });
 
-router.post("/organizations/:slug/join", requireAuth, async (req, res) => {
+router.post("/organizations/join", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
+  const { accessCode } = req.body as { accessCode?: string };
+  if (!accessCode) {
+    res.status(400).json({ error: "Voting reference (access code) is required" });
+    return;
+  }
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
-  if (!org || !org.isPublic) {
-    res.status(404).json({ error: "Organization not found or private" });
+    .where(eq(organizations.accessCode, accessCode.trim().toUpperCase()));
+  if (!org) {
+    res.status(404).json({ error: "Invalid voting reference" });
     return;
   }
   const [existing] = await db
@@ -130,14 +151,27 @@ router.post("/organizations/:slug/join", requireAuth, async (req, res) => {
     .from(orgMembers)
     .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, uid)));
   if (existing) {
-    res.status(409).json({ error: "Already a member" });
+    res.status(200).json({ ...org, myRole: existing.role, memberCount: 0, electionCount: 0 });
     return;
   }
   const [member] = await db
     .insert(orgMembers)
     .values({ orgId: org.id, userId: uid, role: "voter" })
     .returning();
-  res.status(201).json({ ...org, myRole: member.role });
+  const [mc] = await db
+    .select({ count: count() })
+    .from(orgMembers)
+    .where(eq(orgMembers.orgId, org.id));
+  const [ec] = await db
+    .select({ count: count() })
+    .from(elections)
+    .where(eq(elections.orgId, org.id));
+  res.status(201).json({
+    ...org,
+    myRole: member.role,
+    memberCount: Number(mc.count),
+    electionCount: Number(ec.count),
+  });
 });
 
 router.get("/organizations/:slug/members", requireAuth, async (req, res) => {
@@ -145,7 +179,7 @@ router.get("/organizations/:slug/members", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -180,7 +214,7 @@ router.post("/organizations/:slug/members", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -225,11 +259,11 @@ router.post("/organizations/:slug/members", requireAuth, async (req, res) => {
 
 router.put("/organizations/:slug/members/:userId/role", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const targetUserId = parseInt(req.params.userId);
+  const targetUserId = parseInt(req.params.userId as string);
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -257,11 +291,11 @@ router.put("/organizations/:slug/members/:userId/role", requireAuth, async (req,
 
 router.delete("/organizations/:slug/members/:userId", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const targetUserId = parseInt(req.params.userId);
+  const targetUserId = parseInt(req.params.userId as string);
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -285,7 +319,7 @@ router.get("/organizations/:slug/elections", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;
@@ -310,7 +344,7 @@ router.get("/organizations/:slug/analytics", requireAuth, async (req, res) => {
   const [org] = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.slug, req.params.slug));
+    .where(eq(organizations.slug, req.params.slug as string));
   if (!org) {
     res.status(404).json({ error: "Not found" });
     return;

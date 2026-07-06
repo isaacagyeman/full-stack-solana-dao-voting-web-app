@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useCreateElection, useGetOrganization } from "@workspace/api-client-react";
+import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,14 @@ function formatDatetimeLocal(d: Date) {
 export default function CreateElection() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const { data: org } = useGetOrganization(slug);
+
+  useEffect(() => {
+    if (user && user.role !== "organizer") {
+      navigate(`/orgs/${slug}`);
+    }
+  }, [user, slug, navigate]);
 
   const now = new Date();
   const start = new Date(now.getTime() + 60 * 60 * 1000);

@@ -8,18 +8,23 @@ import { requireAuth } from "../middlewares/auth";
 const router = Router();
 const JWT_SECRET = process.env.SESSION_SECRET ?? "fallback-dev-secret";
 
-function makeToken(userId: number, email: string, name: string) {
-  return jwt.sign({ userId, email, name }, JWT_SECRET, { expiresIn: "7d" });
+function makeToken(userId: number, email: string, name: string, role: string) {
+  return jwt.sign({ userId, email, name, role }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 router.post("/auth/signup", async (req, res) => {
-  const { email, password, name } = req.body as {
+  const { email, password, name, role } = req.body as {
     email?: string;
     password?: string;
     name?: string;
+    role?: string;
   };
-  if (!email || !password || !name) {
-    res.status(400).json({ error: "Email, password, and name are required" });
+  if (!email || !password || !name || !role) {
+    res.status(400).json({ error: "Email, password, name, and role are required" });
+    return;
+  }
+  if (role !== "organizer" && role !== "voter") {
+    res.status(400).json({ error: "Role must be either 'organizer' or 'voter'" });
     return;
   }
   const [existing] = await db.select().from(users).where(eq(users.email, email));
@@ -30,9 +35,9 @@ router.post("/auth/signup", async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
   const [user] = await db
     .insert(users)
-    .values({ email, passwordHash, name, emailVerified: true, verificationLevel: 1 })
+    .values({ email, passwordHash, name, role, emailVerified: true, verificationLevel: 1 })
     .returning();
-  const token = makeToken(user.id, user.email, user.name);
+  const token = makeToken(user.id, user.email, user.name, user.role);
   const { passwordHash: _ph, ...safeUser } = user;
   res.status(201).json({ token, user: safeUser });
 });
@@ -48,7 +53,7 @@ router.post("/auth/login", async (req, res) => {
     res.status(401).json({ error: "Invalid email or password" });
     return;
   }
-  const token = makeToken(user.id, user.email, user.name);
+  const token = makeToken(user.id, user.email, user.name, user.role);
   const { passwordHash: _ph, ...safeUser } = user;
   res.json({ token, user: safeUser });
 });

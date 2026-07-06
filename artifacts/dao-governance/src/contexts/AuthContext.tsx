@@ -5,6 +5,7 @@ interface User {
   id: number;
   email: string;
   name: string;
+  role: "organizer" | "voter";
   phone?: string;
   emailVerified: boolean;
   phoneVerified: boolean;

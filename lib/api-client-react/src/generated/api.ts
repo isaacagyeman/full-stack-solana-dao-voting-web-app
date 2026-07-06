@@ -25,6 +25,7 @@ import type {
   CreateOrgInput,
   Election,
   ElectionResults,
+  JoinOrgInput,
   ListElectionsParams,
   ListOrgElectionsParams,
   LoginInput,
@@ -574,38 +575,40 @@ export const useUpdateOrganization = <
   return useMutation(getUpdateOrganizationMutationOptions(options));
 };
 
-export const getJoinOrganizationUrl = (slug: string) => {
-  return `/api/organizations/${slug}/join`;
+export const getJoinOrganizationByCodeUrl = () => {
+  return `/api/organizations/join`;
 };
 
-export const joinOrganization = async (
-  slug: string,
+export const joinOrganizationByCode = async (
+  joinOrgInput: JoinOrgInput,
   options?: RequestInit,
-): Promise<OrgMember> => {
-  return customFetch<OrgMember>(getJoinOrganizationUrl(slug), {
+): Promise<Organization> => {
+  return customFetch<Organization>(getJoinOrganizationByCodeUrl(), {
     ...options,
     method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(joinOrgInput),
   });
 };
 
-export const getJoinOrganizationMutationOptions = <
+export const getJoinOrganizationByCodeMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof joinOrganization>>,
+    Awaited<ReturnType<typeof joinOrganizationByCode>>,
     TError,
-    { slug: string },
+    { data: BodyType<JoinOrgInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof joinOrganization>>,
+  Awaited<ReturnType<typeof joinOrganizationByCode>>,
   TError,
-  { slug: string },
+  { data: BodyType<JoinOrgInput> },
   TContext
 > => {
-  const mutationKey = ["joinOrganization"];
+  const mutationKey = ["joinOrganizationByCode"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -615,41 +618,41 @@ export const getJoinOrganizationMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof joinOrganization>>,
-    { slug: string }
+    Awaited<ReturnType<typeof joinOrganizationByCode>>,
+    { data: BodyType<JoinOrgInput> }
   > = (props) => {
-    const { slug } = props ?? {};
+    const { data } = props ?? {};
 
-    return joinOrganization(slug, requestOptions);
+    return joinOrganizationByCode(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type JoinOrganizationMutationResult = NonNullable<
-  Awaited<ReturnType<typeof joinOrganization>>
+export type JoinOrganizationByCodeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof joinOrganizationByCode>>
 >;
+export type JoinOrganizationByCodeMutationBody = BodyType<JoinOrgInput>;
+export type JoinOrganizationByCodeMutationError = ErrorType<unknown>;
 
-export type JoinOrganizationMutationError = ErrorType<unknown>;
-
-export const useJoinOrganization = <
+export const useJoinOrganizationByCode = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof joinOrganization>>,
+    Awaited<ReturnType<typeof joinOrganizationByCode>>,
     TError,
-    { slug: string },
+    { data: BodyType<JoinOrgInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof joinOrganization>>,
+  Awaited<ReturnType<typeof joinOrganizationByCode>>,
   TError,
-  { slug: string },
+  { data: BodyType<JoinOrgInput> },
   TContext
 > => {
-  return useMutation(getJoinOrganizationMutationOptions(options));
+  return useMutation(getJoinOrganizationByCodeMutationOptions(options));
 };
 
 export const getListMembersUrl = (slug: string) => {

@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
-import { getListOrganizationsQueryKey } from "@workspace/api-client-react";
+import { getListOrganizationsQueryKey, useJoinOrganizationByCode } from "@workspace/api-client-react";
 import {
   Building2,
   Plus,
@@ -28,6 +28,7 @@ import {
   ChevronRight,
   LayoutGrid,
   AlertCircle,
+  KeyRound,
 } from "lucide-react";
 
 function RoleBadge({ role }: { role: string }) {
@@ -53,6 +54,12 @@ export default function Dashboard() {
   const [orgDesc, setOrgDesc] = useState("");
   const [createError, setCreateError] = useState("");
 
+  const [showJoin, setShowJoin] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [joinError, setJoinError] = useState("");
+
+  const isOrganizer = user?.role === "organizer";
+
   const { data: orgs, isLoading } = useListOrganizations();
 
   const createMutation = useCreateOrganization({
@@ -65,6 +72,21 @@ export default function Dashboard() {
       },
       onError(err: unknown) {
         setCreateError((err as { data?: { error?: string } })?.data?.error ?? "Failed to create");
+      },
+    },
+  });
+
+  const joinMutation = useJoinOrganizationByCode({
+    mutation: {
+      onSuccess(data) {
+        qc.invalidateQueries({ queryKey: getListOrganizationsQueryKey() });
+        setShowJoin(false);
+        setAccessCode("");
+        setJoinError("");
+        navigate(`/orgs/${(data as { slug: string }).slug}`);
+      },
+      onError(err: unknown) {
+        setJoinError((err as { data?: { error?: string } })?.data?.error ?? "Invalid voting reference");
       },
     },
   });
@@ -82,13 +104,24 @@ export default function Dashboard() {
               </h1>
               <p className="text-slate-500 mt-1">Manage your organizations and elections</p>
             </div>
-            <Button
-              onClick={() => setShowCreate(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              New organization
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowJoin(true)}
+              >
+                <KeyRound className="w-4 h-4 mr-1.5" />
+                Join with voting reference
+              </Button>
+              {isOrganizer && (
+                <Button
+                  onClick={() => setShowCreate(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New organization
+                </Button>
+              )}
+            </div>
           </div>
 
           {isLoading ? (
@@ -152,12 +185,21 @@ export default function Dashboard() {
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">No organizations yet</h3>
               <p className="text-slate-500 mb-6 max-w-xs mx-auto">
-                Create your first organization to start running elections.
+                {isOrganizer
+                  ? "Create your first organization to start running elections."
+                  : "Ask your election organizer for a voting reference to join an organization."}
               </p>
-              <Button onClick={() => setShowCreate(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Plus className="w-4 h-4 mr-1.5" />
-                Create organization
-              </Button>
+              {isOrganizer ? (
+                <Button onClick={() => setShowCreate(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Create organization
+                </Button>
+              ) : (
+                <Button onClick={() => setShowJoin(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <KeyRound className="w-4 h-4 mr-1.5" />
+                  Join with voting reference
+                </Button>
+              )}
             </div>
           )}
         </motion.div>
@@ -204,6 +246,42 @@ export default function Dashboard() {
               }
             >
               {createMutation.isPending ? "Creating…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showJoin} onOpenChange={setShowJoin}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Join with voting reference</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {joinError && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2.5 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {joinError}
+              </div>
+            )}
+            <div>
+              <Label>Voting reference / access code</Label>
+              <Input
+                className="mt-1.5"
+                placeholder="e.g. SPRING01"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+              />
+              <p className="text-xs text-slate-400 mt-1">Ask your election organizer for this code.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowJoin(false)}>Cancel</Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={!accessCode.trim() || joinMutation.isPending}
+              onClick={() => joinMutation.mutate({ data: { accessCode: accessCode.trim() } })}
+            >
+              {joinMutation.isPending ? "Joining…" : "Join"}
             </Button>
           </DialogFooter>
         </DialogContent>

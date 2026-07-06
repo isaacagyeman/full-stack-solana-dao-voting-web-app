@@ -183,6 +183,15 @@ export default function OrgDashboard() {
                     {myRole}
                   </span>
                 </div>
+                {isAdmin && (org as { accessCode?: string }).accessCode && (
+                  <div className="flex items-center gap-2 mt-3 text-sm">
+                    <span className="text-slate-500">Voting reference:</span>
+                    <span className="font-mono font-semibold tracking-wide bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">
+                      {(org as { accessCode?: string }).accessCode}
+                    </span>
+                    <span className="text-xs text-slate-400">Share this with voters to let them join</span>
+                  </div>
+                )}
               </div>
             </div>
 

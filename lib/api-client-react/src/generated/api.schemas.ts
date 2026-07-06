@@ -4,10 +4,19 @@
  * Api
  * OpenAPI spec version: 1.0.0
  */
+export type SignupInputRole =
+  (typeof SignupInputRole)[keyof typeof SignupInputRole];
+
+export const SignupInputRole = {
+  organizer: "organizer",
+  voter: "voter",
+} as const;
+
 export interface SignupInput {
   email: string;
   password: string;
   name: string;
+  role: SignupInputRole;
 }
 
 export interface LoginInput {
@@ -15,10 +24,18 @@ export interface LoginInput {
   password: string;
 }
 
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
+
+export const UserRole = {
+  organizer: "organizer",
+  voter: "voter",
+} as const;
+
 export interface User {
   id: number;
   email: string;
   name: string;
+  role: UserRole;
   phone?: string;
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -36,6 +53,7 @@ export interface Organization {
   id: number;
   name: string;
   slug: string;
+  accessCode: string;
   description?: string;
   logoUrl?: string;
   isPublic: boolean;
@@ -75,6 +93,10 @@ export interface AddMemberInput {
 
 export interface UpdateMemberRoleInput {
   role: string;
+}
+
+export interface JoinOrgInput {
+  accessCode: string;
 }
 
 export interface Candidate {

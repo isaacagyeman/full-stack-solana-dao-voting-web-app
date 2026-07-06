@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldCheck, AlertCircle, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, AlertCircle, Eye, EyeOff, CheckCircle2, Gavel, Vote } from "lucide-react";
 
 export default function Signup() {
   const [, navigate] = useLocation();
@@ -14,6 +14,7 @@ export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"organizer" | "voter">("voter");
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,7 +38,7 @@ export default function Signup() {
       setError("Password must be at least 8 characters");
       return;
     }
-    signupMutation.mutate({ data: { email, password, name } });
+    signupMutation.mutate({ data: { email, password, name, role } });
   }
 
   return (
@@ -73,6 +74,40 @@ export default function Signup() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <Label className="text-slate-700 font-medium mb-1.5 block">I am signing up as a…</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setRole("voter")}
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm font-medium transition-colors ${
+                      role === "voter"
+                        ? "border-blue-600 bg-blue-50 text-blue-700"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <Vote className="w-5 h-5" />
+                    Voter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole("organizer")}
+                    className={`flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm font-medium transition-colors ${
+                      role === "organizer"
+                        ? "border-blue-600 bg-blue-50 text-blue-700"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300"
+                    }`}
+                  >
+                    <Gavel className="w-5 h-5" />
+                    Election organizer
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5">
+                  {role === "organizer"
+                    ? "Organizers create organizations and run elections."
+                    : "Voters join an organization with a voting reference to cast ballots."}
+                </p>
+              </div>
               <div>
                 <Label htmlFor="name" className="text-slate-700 font-medium">Full name</Label>
                 <Input

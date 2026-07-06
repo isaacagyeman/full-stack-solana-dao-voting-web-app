@@ -10,6 +10,7 @@ export const SignupBody = zod.object({
   email: zod.string(),
   password: zod.string(),
   name: zod.string(),
+  role: zod.enum(["organizer", "voter"]),
 });
 
 export const LoginBody = zod.object({
@@ -23,6 +24,7 @@ export const LoginResponse = zod.object({
     id: zod.number(),
     email: zod.string(),
     name: zod.string(),
+    role: zod.enum(["organizer", "voter"]),
     phone: zod.string().optional(),
     emailVerified: zod.boolean(),
     phoneVerified: zod.boolean(),
@@ -36,6 +38,7 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   name: zod.string(),
+  role: zod.enum(["organizer", "voter"]),
   phone: zod.string().optional(),
   emailVerified: zod.boolean(),
   phoneVerified: zod.boolean(),
@@ -48,6 +51,7 @@ export const ListOrganizationsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
   slug: zod.string(),
+  accessCode: zod.string(),
   description: zod.string().optional(),
   logoUrl: zod.string().optional(),
   isPublic: zod.boolean(),
@@ -75,6 +79,7 @@ export const GetOrganizationResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   slug: zod.string(),
+  accessCode: zod.string(),
   description: zod.string().optional(),
   logoUrl: zod.string().optional(),
   isPublic: zod.boolean(),
@@ -99,6 +104,7 @@ export const UpdateOrganizationResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
   slug: zod.string(),
+  accessCode: zod.string(),
   description: zod.string().optional(),
   logoUrl: zod.string().optional(),
   isPublic: zod.boolean(),
@@ -109,18 +115,23 @@ export const UpdateOrganizationResponse = zod.object({
   createdAt: zod.string(),
 });
 
-export const JoinOrganizationParams = zod.object({
-  slug: zod.coerce.string(),
+export const JoinOrganizationByCodeBody = zod.object({
+  accessCode: zod.string(),
 });
 
-export const JoinOrganizationResponse = zod.object({
+export const JoinOrganizationByCodeResponse = zod.object({
   id: zod.number(),
-  userId: zod.number(),
-  orgId: zod.number(),
   name: zod.string(),
-  email: zod.string(),
-  role: zod.string(),
-  joinedAt: zod.string(),
+  slug: zod.string(),
+  accessCode: zod.string(),
+  description: zod.string().optional(),
+  logoUrl: zod.string().optional(),
+  isPublic: zod.boolean(),
+  ownerId: zod.number(),
+  memberCount: zod.number(),
+  electionCount: zod.number(),
+  myRole: zod.string().optional(),
+  createdAt: zod.string(),
 });
 
 export const ListMembersParams = zod.object({

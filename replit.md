@@ -38,6 +38,8 @@ A decentralized DAO governance platform built on Solana — connect your wallet,
 - Duplicate vote prevention: server enforces one vote per (proposalId, voterAddress) pair.
 - `zod/v3` used in `CreateProposal.tsx` form validation to avoid type conflict with `@hookform/resolvers` which bundles its own zod v3 types.
 - Solana RPC points to devnet; txSignature is stored but actual on-chain submission is optional (UI works without it).
+- Role-based access control: every user has a global `role` (`organizer` | `voter`), chosen at signup and embedded in the JWT. Organizers can create organizations and elections; voters cannot. This is separate from the existing per-organization `orgMembers.role` (admin/officer/voter/observer), which continues to gate in-org actions like managing members.
+- Organizations have a unique `accessCode` ("voting reference") generated on creation. Voters join an org via `POST /organizations/join` with the code instead of browsing/joining public orgs by slug.
 
 ## Product
 

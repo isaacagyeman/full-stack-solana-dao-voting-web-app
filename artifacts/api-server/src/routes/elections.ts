@@ -62,6 +62,10 @@ router.post("/elections", requireAuth, async (req, res) => {
     res.status(400).json({ error: "orgId, title, startTime, and endTime are required" });
     return;
   }
+  if (req.user!.role !== "organizer") {
+    res.status(403).json({ error: "Only election organizers can create elections" });
+    return;
+  }
   const [myMembership] = await db
     .select()
     .from(orgMembers)
@@ -101,7 +105,7 @@ router.post("/elections", requireAuth, async (req, res) => {
 
 router.get("/elections/:id", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Election not found" });
@@ -125,7 +129,7 @@ router.get("/elections/:id", requireAuth, async (req, res) => {
 
 router.put("/elections/:id", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -173,7 +177,7 @@ router.put("/elections/:id", requireAuth, async (req, res) => {
 
 router.post("/elections/:id/candidates", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -205,8 +209,8 @@ router.post("/elections/:id/candidates", requireAuth, async (req, res) => {
 
 router.delete("/elections/:id/candidates/:candidateId", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
-  const candidateId = parseInt(req.params.candidateId);
+  const electionId = parseInt(req.params.id as string);
+  const candidateId = parseInt(req.params.candidateId as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -226,7 +230,7 @@ router.delete("/elections/:id/candidates/:candidateId", requireAuth, async (req,
 
 router.post("/elections/:id/publish", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -261,7 +265,7 @@ router.post("/elections/:id/publish", requireAuth, async (req, res) => {
 
 router.post("/elections/:id/close", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -285,7 +289,7 @@ router.post("/elections/:id/close", requireAuth, async (req, res) => {
 
 router.post("/elections/:id/vote", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Election not found" });
@@ -360,7 +364,7 @@ router.post("/elections/:id/vote", requireAuth, async (req, res) => {
 
 router.get("/elections/:id/my-vote", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [vote] = await db
     .select()
     .from(votes)
@@ -382,7 +386,7 @@ router.get("/elections/:id/my-vote", requireAuth, async (req, res) => {
 
 router.get("/elections/:id/results", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });
@@ -452,7 +456,7 @@ router.get("/elections/:id/results", requireAuth, async (req, res) => {
 
 router.get("/elections/:id/audit", requireAuth, async (req, res) => {
   const uid = req.user!.userId;
-  const electionId = parseInt(req.params.id);
+  const electionId = parseInt(req.params.id as string);
   const [election] = await db.select().from(elections).where(eq(elections.id, electionId));
   if (!election) {
     res.status(404).json({ error: "Not found" });

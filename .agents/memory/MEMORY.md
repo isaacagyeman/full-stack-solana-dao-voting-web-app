@@ -1,0 +1,2 @@
+- [Express 5 req.params typing](express5-params-typing.md) — @types/express@5 types req.params values as `string | string[]`; cast to `string` at usage sites.
+- [drizzle-kit push interactive prompts](drizzle-kit-push-prompts.md) — non-empty-table unique/not-null constraint additions trigger an interactive truncate prompt that can't be piped; use raw SQL instead.
