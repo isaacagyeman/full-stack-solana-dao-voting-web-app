@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
+import { initSolana } from "./lib/solana";
 
 const rawPort = process.env["PORT"];
 
@@ -23,4 +24,5 @@ app.listen(port, (err) => {
   }
   logger.info({ port }, "Server listening");
   seedIfEmpty().catch((e) => logger.error({ err: e }, "Seed failed"));
+  initSolana().catch((e) => logger.error({ err: e }, "Solana init failed"));
 });

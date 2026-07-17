@@ -22,6 +22,7 @@ import {
   Lock,
   Users,
   Trophy,
+  ExternalLink,
 } from "lucide-react";
 
 type Candidate = { id: number; name: string; description?: string | null };
@@ -248,17 +249,32 @@ export default function ElectionDetail() {
                   <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle2 className="w-8 h-8 text-green-600" />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">Vote recorded!</h3>
-                  <p className="text-slate-500 text-sm mb-4">Your ballot has been securely recorded on the blockchain.</p>
-                  <div className="bg-slate-50 rounded-xl p-4 text-left space-y-2">
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Vote recorded on-chain!</h3>
+                  <p className="text-slate-500 text-sm mb-4">
+                    {voteSuccess.sig
+                      ? "Your ballot has been anchored to the Solana blockchain."
+                      : "Your vote is recorded. On-chain confirmation is processing."}
+                  </p>
+                  <div className="bg-slate-50 rounded-xl p-4 text-left space-y-3">
                     <div>
-                      <p className="text-xs text-slate-400 mb-0.5">Vote hash</p>
+                      <p className="text-xs text-slate-400 mb-0.5">Vote hash (SHA-256)</p>
                       <p className="text-xs font-mono text-slate-600 break-all">{voteSuccess.hash}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-slate-400 mb-0.5">Transaction signature</p>
-                      <p className="text-xs font-mono text-slate-600 break-all">{voteSuccess.sig}</p>
-                    </div>
+                    {voteSuccess.sig && (
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Solana transaction</p>
+                        <a
+                          href={`https://explorer.solana.com/tx/${voteSuccess.sig}?cluster=devnet`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 font-mono break-all underline underline-offset-2"
+                        >
+                          {voteSuccess.sig.slice(0, 32)}…{voteSuccess.sig.slice(-8)}
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                        </a>
+                        <p className="text-[11px] text-slate-400 mt-1">Opens Solana Explorer (devnet)</p>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ) : hasVoted ? (

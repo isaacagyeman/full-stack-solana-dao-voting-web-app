@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "crypto";
 import { db, organizations, orgMembers, elections, candidates, votes } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
+import { submitVoteMemo } from "../lib/solana";
 
 const router = Router();
 
@@ -346,8 +347,9 @@ router.post("/elections/:id/vote", requireAuth, async (req, res) => {
   const voteHash = createHash("sha256")
     .update(`${uid}:${electionId}:${JSON.stringify(choices)}:${timestamp}`)
     .digest("hex");
-  const txSignature = generateBase58(88);
-  const blockHeight = Math.floor(Math.random() * 1_000_000) + 280_000_000;
+
+  const { txSignature, blockHeight } = await submitVoteMemo(voteHash);
+
   const [vote] = await db
     .insert(votes)
     .values({ electionId, userId: uid, choices, voteHash, txSignature, blockHeight })
@@ -357,7 +359,9 @@ router.post("/elections/:id/vote", requireAuth, async (req, res) => {
     voteHash: vote.voteHash,
     txSignature: vote.txSignature,
     blockHeight: vote.blockHeight,
-    message: "Your vote has been recorded securely on the blockchain",
+    message: txSignature
+      ? "Your vote has been recorded on the Solana blockchain"
+      : "Your vote has been recorded (on-chain submission pending)",
     choices,
   });
 });
