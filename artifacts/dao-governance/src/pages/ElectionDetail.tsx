@@ -145,6 +145,7 @@ export default function ElectionDetail() {
   const isDraft = election.status === "draft";
   const isClosed = election.status === "closed";
   const isUpcoming = isActive && now < new Date(election.startTime).getTime();
+  const isExpired = isActive && now > new Date(election.endTime).getTime();
   const maxChoices = election.type === "single" || election.type === "yesno" ? 1 : (election.maxChoices ?? 1);
 
   function toggleCandidate(cid: number) {
@@ -295,6 +296,22 @@ export default function ElectionDetail() {
                     Candidates will be revealed when voting begins on {formatDate(election.startTime)}.
                   </p>
                   <CountdownTimer target={election.startTime} now={now} />
+                </div>
+              ) : isClosed || isExpired ? (
+                <div className="py-10 text-center">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                    <Lock className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">Voting has ended</h3>
+                  <p className="text-slate-500 text-sm mb-6">
+                    This poll closed on {formatDate(election.endTime)}. No more votes can be submitted.
+                  </p>
+                  <Link href={`/orgs/${slug}/elections/${electionId}/results`}>
+                    <Button variant="outline" className="gap-2">
+                      <BarChart3 className="w-4 h-4" />
+                      View results
+                    </Button>
+                  </Link>
                 </div>
               ) : (
                 <>
