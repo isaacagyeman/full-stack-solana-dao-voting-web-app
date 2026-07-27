@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -12,6 +12,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  MultiPollVotingFlow,
+  VoteReviewPanel,
+  type PollSlide,
+} from "@/components/features/feature-components";
 import {
   ChevronLeft,
   CheckCircle2,
@@ -77,6 +82,8 @@ export default function ElectionDetail() {
   const [voteSuccess, setVoteSuccess] = useState<{ hash: string; sig: string } | null>(null);
   const [voteError, setVoteError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  const [currentPollIndex, setCurrentPollIndex] = useState(0);
+  const [reviewMode, setReviewMode] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -148,6 +155,23 @@ export default function ElectionDetail() {
   const isExpired = isActive && now > new Date(election.endTime).getTime();
   const maxChoices = election.type === "single" || election.type === "yesno" ? 1 : (election.maxChoices ?? 1);
 
+  const pollSlides = useMemo<PollSlide[]>(() => {
+    if (!candidates.length) return [];
+    return [
+      {
+        id: 1,
+        title: "Main ballot",
+        description: "Select your preferred option for this election.",
+        options: candidates.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          description: candidate.description ?? undefined,
+          imageUrl: undefined,
+        })),
+      },
+    ];
+  }, [candidates]);
+
   function toggleCandidate(cid: number) {
     if (hasVoted || !isActive) return;
     if (maxChoices === 1) {
@@ -162,6 +186,29 @@ export default function ElectionDetail() {
   function handleVote() {
     setVoteError("");
     castVoteMutation.mutate({ id: electionId, data: { choices: selected } });
+  }
+
+  function handleSelectPollOption(pollId: number, optionId: number) {
+    void pollId;
+    toggleCandidate(optionId);
+  }
+
+  function goToNextSlide() {
+    if (currentPollIndex < pollSlides.length - 1) {
+      setCurrentPollIndex((prev) => prev + 1);
+    }
+  }
+
+  function goToPreviousSlide() {
+    setCurrentPollIndex((prev) => Math.max(prev - 1, 0));
+  }
+
+  function handleReview() {
+    setReviewMode(true);
+  }
+
+  function handleEditSelections() {
+    setReviewMode(false);
   }
 
   return (
@@ -329,60 +376,33 @@ export default function ElectionDetail() {
                     </div>
                   )}
 
-                  <div className="space-y-3 mb-6">
-                    {candidates.map((c, i) => {
-                      const isSelected = selected.includes(c.id);
-                      return (
-                        <motion.div
-                          key={c.id}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          onClick={() => toggleCandidate(c.id)}
-                          className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                            isSelected
-                              ? "border-blue-500 bg-blue-50 shadow-sm"
-                              : isActive
-                              ? "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
-                              : "border-slate-200 opacity-60 cursor-not-allowed"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div
-                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                  isSelected ? "border-blue-500 bg-blue-500" : "border-slate-300"
-                                }`}
-                              >
-                                {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-slate-900">{c.name}</p>
-                                {c.description && (
-                                  <p className="text-sm text-slate-500 mt-0.5">{c.description}</p>
-                                )}
-                              </div>
-                            </div>
-                            {isSelected && <CheckCircle2 className="w-5 h-5 text-blue-500 flex-shrink-0" />}
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
+                  {isActive && !reviewMode && pollSlides.length > 0 && (
+                    <MultiPollVotingFlow
+                      polls={pollSlides}
+                      currentPollIndex={currentPollIndex}
+                      selections={{ 1: selected[0] }}
+                      onSelect={handleSelectPollOption}
+                      onNext={goToNextSlide}
+                      onPrevious={goToPreviousSlide}
+                      onReview={handleReview}
+                      isSubmitting={castVoteMutation.isPending}
+                    />
+                  )}
+
+                  {isActive && reviewMode && pollSlides.length > 0 && (
+                    <VoteReviewPanel
+                      polls={pollSlides}
+                      selections={{ 1: selected[0] }}
+                      onEdit={handleEditSelections}
+                      onConfirm={handleVote}
+                      isSubmitting={castVoteMutation.isPending}
+                    />
+                  )}
 
                   {isActive && (
-                    <div className="space-y-3">
-                      <Button
-                        onClick={handleVote}
-                        disabled={selected.length === 0 || castVoteMutation.isPending}
-                        className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                      >
-                        {castVoteMutation.isPending ? "Submitting…" : "Submit my vote"}
-                      </Button>
-                      <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1">
-                        <Lock className="w-3.5 h-3.5" />
-                        Your identity is not linked to your ballot
-                      </p>
+                    <div className="mt-4 text-xs text-slate-400 text-center flex items-center justify-center gap-1">
+                      <Lock className="w-3.5 h-3.5" />
+                      Your identity is not linked to your ballot
                     </div>
                   )}
                 </>

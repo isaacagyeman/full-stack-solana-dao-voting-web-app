@@ -10,13 +10,23 @@
   },
   "private": true,
   "devDependencies": {
-    "typescript": "~5.9.2",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
   },
   "pnpm": {
     "supportedArchitectures": {
-      "os": ["linux", "win32", "darwin"],
-      "cpu": ["x64", "arm64"]
+      "os": [
+        "linux",
+        "win32",
+        "darwin"
+      ],
+      "cpu": [
+        "x64",
+        "arm64"
+      ]
     }
+  },
+  "dependencies": {
+    "pnpm": "^11.17.0"
   }
 }

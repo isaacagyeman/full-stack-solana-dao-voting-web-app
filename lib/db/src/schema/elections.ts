@@ -16,6 +16,7 @@ export const elections = pgTable("elections", {
   maxChoices: integer("max_choices").default(1).notNull(),
   quorum: integer("quorum").default(0).notNull(),
   electionHash: varchar("election_hash", { length: 64 }),
+  requiredGroupId: integer("required_group_id"), // FEATURE 4: Null means all members can vote
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

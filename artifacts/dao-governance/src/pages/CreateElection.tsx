@@ -14,9 +14,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  CandidateImageUpload,
+  CsvImportPanel,
+  NotificationPreferencesPanel,
+  VoterTokenDisplay,
+  type CsvImportRow,
+} from "@/components/features/feature-components";
 import { Plus, Trash2, ChevronLeft, AlertCircle } from "lucide-react";
 
-type CandidateInput = { name: string; description: string };
+type CandidateInput = { name: string; description: string; imageUrl?: string };
 
 function formatDatetimeLocal(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -45,9 +53,11 @@ export default function CreateElection() {
   const [startTime, setStartTime] = useState(formatDatetimeLocal(start));
   const [endTime, setEndTime] = useState(formatDatetimeLocal(end));
   const [candidateList, setCandidates] = useState<CandidateInput[]>([
-    { name: "", description: "" },
-    { name: "", description: "" },
+    { name: "", description: "", imageUrl: "" },
+    { name: "", description: "", imageUrl: "" },
   ]);
+  const [csvValue, setCsvValue] = useState("");
+  const [tokenPreview, setTokenPreview] = useState("VTR-2024-ALPHA-001");
   const [error, setError] = useState("");
 
   const createMutation = useCreateElection({
@@ -62,7 +72,7 @@ export default function CreateElection() {
   });
 
   function addCandidate() {
-    setCandidates((prev) => [...prev, { name: "", description: "" }]);
+    setCandidates((prev) => [...prev, { name: "", description: "", imageUrl: "" }]);
   }
 
   function removeCandidate(i: number) {
@@ -71,6 +81,15 @@ export default function CreateElection() {
 
   function updateCandidate(i: number, field: keyof CandidateInput, value: string) {
     setCandidates((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
+  }
+
+  function handleImportRows(rows: CsvImportRow[]) {
+    const imported = rows.map((row) => ({ name: row.name, description: row.description, imageUrl: "" }));
+    setCandidates((prev) => {
+      const merged = [...prev];
+      imported.forEach((candidate) => merged.push(candidate));
+      return merged.filter((candidate, index) => candidate.name || index < 2);
+    });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -90,7 +109,7 @@ export default function CreateElection() {
         type,
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
-        candidateList: validCandidates.map((c) => ({ name: c.name, description: c.description || undefined })),
+        candidateList: validCandidates.map((c) => ({ name: c.name, description: c.description || undefined, imageUrl: c.imageUrl || undefined })),
       } as never,
     });
   }
@@ -201,6 +220,11 @@ export default function CreateElection() {
                         value={c.description}
                         onChange={(e) => updateCandidate(i, "description", e.target.value)}
                       />
+                      <CandidateImageUpload
+                        value={c.imageUrl ?? ""}
+                        onChange={(value) => updateCandidate(i, "imageUrl", value)}
+                        label={`Photo for ${c.name || `candidate ${i + 1}`}`}
+                      />
                     </div>
                     <button
                       type="button"
@@ -213,7 +237,25 @@ export default function CreateElection() {
                   </div>
                 ))}
               </div>
+              <div className="mt-4">
+                <CsvImportPanel value={csvValue} onChange={setCsvValue} onImport={handleImportRows} />
+              </div>
               <p className="text-xs text-slate-400 mt-3">Minimum 2 options required. The election will be saved as a draft — you can publish it when ready.</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
+              <h2 className="font-semibold text-slate-800 text-sm uppercase tracking-wide">Advanced setup</h2>
+              <NotificationPreferencesPanel />
+              <VoterTokenDisplay token={tokenPreview} />
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <Label className="text-slate-700 font-medium">Eligibility groups</Label>
+                <Textarea
+                  className="mt-2"
+                  rows={3}
+                  placeholder="Add role-based eligibility groups like finance-team, committee, all-members"
+                />
+                <p className="mt-2 text-xs text-slate-400">This view previews the new group-based voter gating flow.</p>
+              </div>
             </div>
 
             <div className="flex gap-3">

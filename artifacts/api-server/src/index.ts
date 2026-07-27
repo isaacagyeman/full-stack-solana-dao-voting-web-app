@@ -2,6 +2,10 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
 import { initSolana } from "./lib/solana";
+import dotenv from "dotenv";
+import path from "path";
+
+dotenv.config({path: path.resolve(__dirname, "../.env")});
 
 const rawPort = process.env["PORT"];
 

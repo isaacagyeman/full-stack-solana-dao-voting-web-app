@@ -1,10 +1,27 @@
 import { Router } from "express";
 import { randomBytes } from "crypto";
-import { db, users, organizations, orgMembers, elections } from "@workspace/db";
+import multer from "multer";
+import { db, users, organizations, orgMembers, elections, voterTokens, bulkVoterUploads } from "@workspace/db";
 import { eq, and, inArray, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
+import { generateVoterToken } from "../lib/voter-tokens";
+import { parseCSV } from "../lib/csv-parser";
 
 const router = Router();
+
+// Multer setup for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowed = ["text/csv", "text/plain", "application/vnd.ms-excel"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only CSV files are supported"));
+    }
+  },
+});
 
 function generateAccessCode(length = 8): string {
   const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -151,13 +168,35 @@ router.post("/organizations/join", requireAuth, async (req, res) => {
     .from(orgMembers)
     .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, uid)));
   if (existing) {
-    res.status(200).json({ ...org, myRole: existing.role, memberCount: 0, electionCount: 0 });
+    // User already a member, but still return their voter token
+    const [token] = await db
+      .select()
+      .from(voterTokens)
+      .where(and(eq(voterTokens.orgId, org.id), eq(voterTokens.userId, uid)));
+    res.status(200).json({
+      ...org,
+      myRole: existing.role,
+      memberCount: 0,
+      electionCount: 0,
+      voterToken: token?.token,
+    });
     return;
   }
+  
+  // Create new member
   const [member] = await db
     .insert(orgMembers)
     .values({ orgId: org.id, userId: uid, role: "voter" })
     .returning();
+  
+  // Generate unique voter token
+  const voterToken = generateVoterToken();
+  await db.insert(voterTokens).values({
+    orgId: org.id,
+    userId: uid,
+    token: voterToken,
+  });
+  
   const [mc] = await db
     .select({ count: count() })
     .from(orgMembers)
@@ -171,6 +210,7 @@ router.post("/organizations/join", requireAuth, async (req, res) => {
     myRole: member.role,
     memberCount: Number(mc.count),
     electionCount: Number(ec.count),
+    voterToken,
   });
 });
 
@@ -249,11 +289,21 @@ router.post("/organizations/:slug/members", requireAuth, async (req, res) => {
     .insert(orgMembers)
     .values({ orgId: org.id, userId: targetUser.id, role: role ?? "voter" })
     .returning();
+  
+  // Generate unique voter token
+  const voterToken = generateVoterToken();
+  await db.insert(voterTokens).values({
+    orgId: org.id,
+    userId: targetUser.id,
+    token: voterToken,
+  });
+  
   res.status(201).json({
     ...member,
     name: targetUser.name,
     email: targetUser.email,
     avatarUrl: targetUser.avatarUrl,
+    voterToken,
   });
 });
 
@@ -375,6 +425,185 @@ router.get("/organizations/:slug/analytics", requireAuth, async (req, res) => {
     activeElectionCount: activeElections.length,
     myRole: myMembership.role,
   });
+});
+
+// Get voter token for current user in an organization
+router.get("/organizations/:slug/my-voter-token", requireAuth, async (req, res) => {
+  const uid = req.user!.userId;
+  const [org] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.slug, req.params.slug as string));
+  if (!org) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  const [membership] = await db
+    .select()
+    .from(orgMembers)
+    .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, uid)));
+  if (!membership) {
+    res.status(403).json({ error: "You are not a member of this organization" });
+    return;
+  }
+  const [token] = await db
+    .select()
+    .from(voterTokens)
+    .where(and(eq(voterTokens.orgId, org.id), eq(voterTokens.userId, uid)));
+  if (!token) {
+    res.status(404).json({ error: "Voter token not found" });
+    return;
+  }
+  res.json({
+    token: token.token,
+    used: token.used,
+    usedAt: token.usedAt,
+    expiresAt: token.expiresAt,
+  });
+});
+
+// Bulk upload voters from CSV (FEATURE 1)
+router.post("/organizations/:slug/members/bulk-upload", requireAuth, upload.single("file"), async (req, res) => {
+  const uid = req.user!.userId;
+  const [org] = await db
+    .select()
+    .from(organizations)
+    .where(eq(organizations.slug, req.params.slug as string));
+  if (!org) {
+    res.status(404).json({ error: "Organization not found" });
+    return;
+  }
+
+  const [myMembership] = await db
+    .select()
+    .from(orgMembers)
+    .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, uid)));
+  if (!myMembership || !["admin", "officer"].includes(myMembership.role)) {
+    res.status(403).json({ error: "Admin or officer access required" });
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({ error: "No file uploaded" });
+    return;
+  }
+
+  try {
+    const csvContent = req.file.buffer.toString("utf-8");
+    const { records, errors } = parseCSV(csvContent);
+
+    if (records.length === 0) {
+      res.status(400).json({ error: "No valid records found in CSV", errors });
+      return;
+    }
+
+    // Log upload attempt
+    const [uploadRecord] = await db
+      .insert(bulkVoterUploads)
+      .values({
+        orgId: org.id,
+        uploadedBy: uid,
+        filename: req.file.originalname,
+        totalRows: records.length,
+        status: "processing",
+      })
+      .returning();
+
+    // Process voters
+    let successCount = 0;
+    let failedRows = 0;
+    const failureLog: Array<{ row: number; email: string; error: string }> = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      try {
+        // Check if user exists
+        let [targetUser] = await db.select().from(users).where(eq(users.email, record.email));
+
+        if (!targetUser) {
+          // Create new user account
+          // Note: This requires a way to set initial password - for now, use a temporary password
+          const bcrypt = await import("bcryptjs");
+          const tempPassword = Math.random().toString(36).substring(2, 15);
+          const passwordHash = await bcrypt.hash(tempPassword, 10);
+
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              email: record.email,
+              name: record.name,
+              passwordHash,
+              phone: record.phone,
+              emailVerified: false,
+            })
+            .returning();
+          targetUser = newUser;
+        }
+
+        // Check if user is already a member
+        const [existing] = await db
+          .select()
+          .from(orgMembers)
+          .where(and(eq(orgMembers.orgId, org.id), eq(orgMembers.userId, targetUser.id)));
+
+        if (existing) {
+          // Already a member, skip
+          continue;
+        }
+
+        // Add user as member
+        await db.insert(orgMembers).values({
+          orgId: org.id,
+          userId: targetUser.id,
+          role: "voter",
+        });
+
+        // Generate voter token
+        const voterToken = generateVoterToken();
+        await db.insert(voterTokens).values({
+          orgId: org.id,
+          userId: targetUser.id,
+          token: voterToken,
+        });
+
+        successCount++;
+      } catch (err) {
+        failedRows++;
+        failureLog.push({
+          row: i + 1,
+          email: record.email,
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+
+    // Update upload record
+    await db
+      .update(bulkVoterUploads)
+      .set({
+        successfulRows: successCount,
+        failedRows,
+        status: failedRows === 0 ? "completed" : "completed",
+        completedAt: new Date(),
+        errorLog: failureLog.length > 0 ? JSON.stringify(failureLog) : null,
+      })
+      .where(eq(bulkVoterUploads.id, uploadRecord.id));
+
+    res.status(201).json({
+      uploadId: uploadRecord.id,
+      totalRows: records.length,
+      successfulRows: successCount,
+      failedRows,
+      errors,
+      failureLog,
+      message: `Successfully added ${successCount} voters to the organization`,
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: "Failed to process CSV",
+      details: err instanceof Error ? err.message : "Unknown error",
+    });
+  }
 });
 
 export default router;
