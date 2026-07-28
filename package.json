@@ -26,7 +26,5 @@
       ]
     }
   },
-  "dependencies": {
-    "pnpm": "^11.17.0"
-  }
+  "dependencies": {}
 }
