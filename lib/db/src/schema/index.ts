@@ -1,5 +1,6 @@
 export * from "./users";
 export * from "./organizations";
+export * from "./election-bundles";
 export * from "./elections";
 export * from "./votes";
 export * from "./voter-tokens";

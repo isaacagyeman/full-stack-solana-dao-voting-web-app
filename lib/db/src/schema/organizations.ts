@@ -16,7 +16,16 @@ export const organizations = pgTable("organizations", {
 export const orgMembers = pgTable("org_members", {
   id: serial("id").primaryKey(),
   orgId: integer("org_id").references(() => organizations.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
+  userId: integer("user_id").references(() => users.id), // nullable — imported members start without an account
   role: varchar("role", { length: 50 }).default("voter").notNull(),
   joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  // Imported member details (populated from Excel import)
+  fullName: varchar("full_name", { length: 255 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
+  department: varchar("department", { length: 255 }),
+  position: varchar("position", { length: 255 }),
+  // Invite lifecycle
+  status: varchar("status", { length: 50 }).default("active").notNull(), // 'invited' | 'active'
+  invitedAt: timestamp("invited_at"),
 });

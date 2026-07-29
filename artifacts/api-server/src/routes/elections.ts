@@ -1,11 +1,17 @@
 import { Router } from "express";
 import { createHash, randomBytes } from "crypto";
 import multer from "multer";
-import { db, users, organizations, orgMembers, elections, candidates, votes, voterTokens, electionVoterGroups, electionGroupMembers, notifications, notificationPreferences, polls, pollOptions, pollVotes } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import {
+  db, users, organizations, orgMembers, elections, candidates, votes, voterTokens,
+  electionVoterGroups, electionGroupMembers, electionVoters, electionBundles,
+  notifications, notificationPreferences, polls, pollOptions, pollVotes,
+} from "@workspace/db";
+import { eq, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 import { submitVoteMemo } from "../lib/solana";
 import { NotificationService } from "../lib/notifications";
+import { generateVoterToken } from "../lib/voter-tokens";
+import { parseCandidateExcelBuffer } from "../lib/excel-parser";
 
 const router = Router();
 

@@ -1,6 +1,7 @@
 import { pgTable, serial, varchar, boolean, integer, text, timestamp } from "drizzle-orm/pg-core";
 import { organizations } from "./organizations";
 import { users } from "./users";
+import { electionBundles } from "./election-bundles";
 
 export const elections = pgTable("elections", {
   id: serial("id").primaryKey(),
@@ -16,7 +17,12 @@ export const elections = pgTable("elections", {
   maxChoices: integer("max_choices").default(1).notNull(),
   quorum: integer("quorum").default(0).notNull(),
   electionHash: varchar("election_hash", { length: 64 }),
-  requiredGroupId: integer("required_group_id"), // FEATURE 4: Null means all members can vote
+  requiredGroupId: integer("required_group_id"),
+  // Feature 5: hide vote counts until election closes
+  hideResults: boolean("hide_results").default(true).notNull(),
+  // Feature 6: multi-event bundle
+  bundleId: integer("bundle_id").references(() => electionBundles.id),
+  bundleOrder: integer("bundle_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

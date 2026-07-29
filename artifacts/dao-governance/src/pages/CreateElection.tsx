@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useCreateElection, useGetOrganization } from "@workspace/api-client-react";
@@ -14,17 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  CandidateImageUpload,
-  CsvImportPanel,
-  NotificationPreferencesPanel,
-  VoterTokenDisplay,
-  type CsvImportRow,
-} from "@/components/features/feature-components";
-import { Plus, Trash2, ChevronLeft, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { CandidateImageUpload } from "@/components/features/feature-components";
+import { Plus, Trash2, ChevronLeft, AlertCircle, FileUp, X, CheckCircle2 } from "lucide-react";
 
 type CandidateInput = { name: string; description: string; imageUrl?: string };
+type ImportedCandidate = { name: string; description?: string };
 
 function formatDatetimeLocal(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -38,9 +33,7 @@ export default function CreateElection() {
   const { data: org } = useGetOrganization(slug);
 
   useEffect(() => {
-    if (user && user.role !== "organizer") {
-      navigate(`/orgs/${slug}`);
-    }
+    if (user && user.role !== "organizer") navigate(`/orgs/${slug}`);
   }, [user, slug, navigate]);
 
   const now = new Date();
@@ -56,9 +49,15 @@ export default function CreateElection() {
     { name: "", description: "", imageUrl: "" },
     { name: "", description: "", imageUrl: "" },
   ]);
-  const [csvValue, setCsvValue] = useState("");
-  const [tokenPreview, setTokenPreview] = useState("VTR-2024-ALPHA-001");
   const [error, setError] = useState("");
+
+  // Excel candidate import
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportedCandidate[]>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const createMutation = useCreateElection({
     mutation: {
@@ -83,23 +82,51 @@ export default function CreateElection() {
     setCandidates((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
   }
 
-  function handleImportRows(rows: CsvImportRow[]) {
-    const imported = rows.map((row) => ({ name: row.name, description: row.description, imageUrl: "" }));
+  async function handleImportFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportFile(file);
+    setImporting(true);
+    setImportErrors([]);
+    setImportPreview([]);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const baseUrl = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+      const resp = await fetch(`${baseUrl}/api/elections/candidates/import-preview`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await resp.json() as { records?: ImportedCandidate[]; errors?: string[] };
+      setImportPreview(data.records ?? []);
+      setImportErrors(data.errors ?? []);
+    } catch {
+      setImportErrors(["Failed to parse file. Make sure it is a valid Excel file."]);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function applyImport() {
+    const imported = importPreview.map((r) => ({ name: r.name, description: r.description ?? "", imageUrl: "" }));
     setCandidates((prev) => {
-      const merged = [...prev];
-      imported.forEach((candidate) => merged.push(candidate));
-      return merged.filter((candidate, index) => candidate.name || index < 2);
+      const merged = [...prev.filter((c) => c.name.trim()), ...imported];
+      return merged.length >= 2 ? merged : [...merged, ...Array(2 - merged.length).fill({ name: "", description: "", imageUrl: "" })];
     });
+    setShowImport(false);
+    setImportFile(null);
+    setImportPreview([]);
+    setImportErrors([]);
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     const validCandidates = candidateList.filter((c) => c.name.trim());
-    if (validCandidates.length < 2) {
-      setError("Please add at least 2 candidates");
-      return;
-    }
+    if (validCandidates.length < 2) { setError("Please add at least 2 candidates"); return; }
     if (!org) return;
     createMutation.mutate({
       data: {
@@ -109,7 +136,11 @@ export default function CreateElection() {
         type,
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
-        candidateList: validCandidates.map((c) => ({ name: c.name, description: c.description || undefined, imageUrl: c.imageUrl || undefined })),
+        candidateList: validCandidates.map((c) => ({
+          name: c.name,
+          description: c.description || undefined,
+          imageUrl: c.imageUrl || undefined,
+        })),
       } as never,
     });
   }
@@ -140,33 +171,21 @@ export default function CreateElection() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* ─── Election details ─── */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-5">
               <h2 className="font-semibold text-slate-800 text-sm uppercase tracking-wide">Election details</h2>
               <div>
                 <Label className="text-slate-700 font-medium">Title</Label>
-                <Input
-                  className="mt-1.5"
-                  placeholder="e.g. Board Director Election 2024"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
+                <Input className="mt-1.5" placeholder="e.g. Board Director Election 2024" value={title} onChange={(e) => setTitle(e.target.value)} required />
               </div>
               <div>
                 <Label className="text-slate-700 font-medium">Description (optional)</Label>
-                <Input
-                  className="mt-1.5"
-                  placeholder="Provide context for voters"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
+                <Input className="mt-1.5" placeholder="Provide context for voters" value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
               <div>
                 <Label className="text-slate-700 font-medium">Election type</Label>
                 <Select value={type} onValueChange={setType}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="single">Single choice — voters pick one option</SelectItem>
                     <SelectItem value="yesno">Yes / No — simple approval vote</SelectItem>
@@ -177,49 +196,86 @@ export default function CreateElection() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-slate-700 font-medium">Start time</Label>
-                  <Input
-                    type="datetime-local"
-                    className="mt-1.5"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    required
-                  />
+                  <Input type="datetime-local" className="mt-1.5" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
                 </div>
                 <div>
                   <Label className="text-slate-700 font-medium">End time</Label>
-                  <Input
-                    type="datetime-local"
-                    className="mt-1.5"
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    required
-                  />
+                  <Input type="datetime-local" className="mt-1.5" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
                 </div>
               </div>
             </div>
 
+            {/* ─── Candidates ─── */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-slate-800 text-sm uppercase tracking-wide">Candidates / options</h2>
-                <Button type="button" variant="outline" size="sm" onClick={addCandidate}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowImport((v) => !v)}>
+                    <FileUp className="w-3.5 h-3.5 mr-1" />
+                    Import Excel
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={addCandidate}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
               </div>
+
+              {/* Excel import panel */}
+              {showImport && (
+                <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-blue-800">Import candidates from Excel</p>
+                    <button type="button" onClick={() => setShowImport(false)} className="text-blue-400 hover:text-blue-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-600">Upload an .xlsx file with a <strong>Name</strong> column and optional <strong>Description</strong> column.</p>
+                  <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFileChange} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={importing}>
+                    <FileUp className="w-3.5 h-3.5 mr-1.5" />
+                    {importing ? "Parsing…" : importFile ? importFile.name : "Choose file"}
+                  </Button>
+
+                  {importErrors.length > 0 && (
+                    <div className="text-xs text-red-600 space-y-0.5">
+                      {importErrors.map((e, i) => <p key={i}>{e}</p>)}
+                    </div>
+                  )}
+
+                  {importPreview.length > 0 && (
+                    <>
+                      <div className="rounded-lg overflow-hidden border border-blue-200 bg-white">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-50"><tr>
+                            <th className="text-left px-3 py-2 text-slate-500">Name</th>
+                            <th className="text-left px-3 py-2 text-slate-500">Description</th>
+                          </tr></thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {importPreview.map((r, i) => (
+                              <tr key={i}>
+                                <td className="px-3 py-2 text-slate-800 font-medium">{r.name}</td>
+                                <td className="px-3 py-2 text-slate-500">{r.description ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <Button type="button" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={applyImport}>
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Add {importPreview.length} candidate{importPreview.length > 1 ? "s" : ""}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-4">
                 {candidateList.map((c, i) => (
                   <div key={i} className="flex gap-3 items-start">
                     <div className="flex-1 space-y-2">
-                      <Input
-                        placeholder={`Option ${i + 1} name *`}
-                        value={c.name}
-                        onChange={(e) => updateCandidate(i, "name", e.target.value)}
-                      />
-                      <Input
-                        placeholder="Brief description (optional)"
-                        value={c.description}
-                        onChange={(e) => updateCandidate(i, "description", e.target.value)}
-                      />
+                      <Input placeholder={`Option ${i + 1} name *`} value={c.name} onChange={(e) => updateCandidate(i, "name", e.target.value)} />
+                      <Input placeholder="Brief description (optional)" value={c.description} onChange={(e) => updateCandidate(i, "description", e.target.value)} />
                       <CandidateImageUpload
                         value={c.imageUrl ?? ""}
                         onChange={(value) => updateCandidate(i, "imageUrl", value)}
@@ -237,36 +293,25 @@ export default function CreateElection() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4">
-                <CsvImportPanel value={csvValue} onChange={setCsvValue} onImport={handleImportRows} />
-              </div>
-              <p className="text-xs text-slate-400 mt-3">Minimum 2 options required. The election will be saved as a draft — you can publish it when ready.</p>
+              <p className="text-xs text-slate-400 mt-3">
+                Minimum 2 options required. The election will be saved as a draft — you can publish it when ready.
+              </p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4">
-              <h2 className="font-semibold text-slate-800 text-sm uppercase tracking-wide">Advanced setup</h2>
-              <NotificationPreferencesPanel />
-              <VoterTokenDisplay token={tokenPreview} />
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <Label className="text-slate-700 font-medium">Eligibility groups</Label>
-                <Textarea
-                  className="mt-2"
-                  rows={3}
-                  placeholder="Add role-based eligibility groups like finance-team, committee, all-members"
-                />
-                <p className="mt-2 text-xs text-slate-400">This view previews the new group-based voter gating flow.</p>
-              </div>
+            {/* ─── Info: eligibility & tokens ─── */}
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-sm text-amber-800">
+              <p className="font-medium mb-1">Voter eligibility &amp; tokens</p>
+              <p className="text-xs text-amber-700">
+                After creating this election, go to the Members page to import eligible voters. When you publish the election,
+                each eligible member will automatically receive a unique personal voting token by email and SMS.
+              </p>
             </div>
 
             <div className="flex gap-3">
               <Button type="button" variant="outline" className="flex-1" onClick={() => navigate(`/orgs/${slug}`)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                disabled={!title || createMutation.isPending}
-              >
+              <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" disabled={!title || createMutation.isPending}>
                 {createMutation.isPending ? "Creating…" : "Create election"}
               </Button>
             </div>

@@ -4,24 +4,10 @@ import { useGetResults, useGetAuditTrail } from "@workspace/api-client-react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
-  ChevronLeft,
-  Trophy,
-  Users,
-  Vote,
-  BarChart3,
-  ShieldCheck,
-  ExternalLink,
-  Clock,
+  ChevronLeft, Trophy, Users, Vote, BarChart3, ShieldCheck, ExternalLink, Lock, Clock,
 } from "lucide-react";
 
 type CandidateResult = {
@@ -46,6 +32,7 @@ type ResultData = {
   winner: CandidateResult | null;
   closedAt?: string | null;
   orgName?: string;
+  resultsHidden?: boolean;
 };
 
 const COLORS = ["#2563eb", "#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd"];
@@ -54,8 +41,19 @@ export default function Results() {
   const { slug, id } = useParams<{ slug: string; id: string }>();
   const electionId = parseInt(id);
 
-  const { data: results, isLoading } = useGetResults(electionId) as { data: ResultData | undefined; isLoading: boolean };
-  const { data: audit } = useGetAuditTrail(electionId) as { data: { electionHash?: string; votes: { id: number; voteHash: string; txSignature: string; blockHeight: number; createdAt: string }[]; integrityVerified?: boolean } | undefined; isLoading: boolean };
+  const { data: results, isLoading, error: resultsError } = useGetResults(electionId) as {
+    data: ResultData | undefined;
+    isLoading: boolean;
+    error: unknown;
+  };
+  const { data: audit } = useGetAuditTrail(electionId) as {
+    data: {
+      electionHash?: string;
+      votes: { id: number; voteHash: string; txSignature: string; blockHeight: number; createdAt: string }[];
+      integrityVerified?: boolean;
+    } | undefined;
+    isLoading: boolean;
+  };
 
   if (isLoading) {
     return (
@@ -65,6 +63,44 @@ export default function Results() {
           <div className="h-8 bg-slate-200 rounded w-72" />
           <div className="h-64 bg-slate-200 rounded-2xl" />
         </div>
+      </div>
+    );
+  }
+
+  // Results hidden while election is active (Feature 5)
+  const isHidden =
+    (resultsError as { status?: number })?.status === 403 ||
+    results?.resultsHidden === true;
+
+  if (isHidden) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <Navbar />
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+          <Link href={`/orgs/${slug}/elections/${id}`}>
+            <button className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-6 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              Back to election
+            </button>
+          </Link>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center"
+          >
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-5">
+              <Lock className="w-8 h-8 text-blue-500" />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-3">Results are sealed</h1>
+            <p className="text-slate-500 max-w-sm mx-auto">
+              Tallies are hidden while voting is in progress. Results will be published automatically when the election closes.
+            </p>
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-blue-600">
+              <Clock className="w-4 h-4" />
+              Check back when the election ends
+            </div>
+          </motion.div>
+        </main>
       </div>
     );
   }
@@ -106,7 +142,7 @@ export default function Results() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                {results.status === "closed" ? "Final results" : "Live results"}
+                {results.status === "closed" ? "Final results" : "Results"}
               </span>
             </div>
             <h1 className="text-2xl font-bold text-slate-900">{results.title}</h1>
@@ -221,6 +257,16 @@ export default function Results() {
                     <span className="text-slate-400 flex-shrink-0 w-5 text-center">#{i + 1}</span>
                     <span className="font-mono text-slate-500 truncate flex-1">{v.voteHash}</span>
                     <span className="text-slate-400 flex-shrink-0">Block {v.blockHeight.toLocaleString()}</span>
+                    {v.txSignature && (
+                      <a
+                        href={`https://explorer.solana.com/tx/${v.txSignature}?cluster=devnet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 text-blue-500 hover:text-blue-700"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
