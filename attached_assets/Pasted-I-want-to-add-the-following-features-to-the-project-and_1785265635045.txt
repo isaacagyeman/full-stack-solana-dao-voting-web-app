@@ -1,0 +1,38 @@
+I want to add the following features to the project and if any of the features already exist, let me know.
+
+1. Vote organizers should be able to add pictures of the candidates so that voters can see who they vote for.
+
+2. When organizers are creating or adding new organization, they should be able to add members of the organization
+by importing an excel file that has the following columns(Full name, email-address, telephone number, Department, Position). These fields should be required (Fullname, email-address and telephone number). After the import, the organizer should be able to preview the members and their information
+in table form and can edit it when necessary before submitting it.
+
+3. Only members added to an organization should have the right to vote once. And for that reason, members of the organization
+eligible to vote should receive a special token in the email-address and telephone number as SMS, so that they can join 
+the election using the election reference code and their unique token to vote once. This is to ensure that no one can give their
+email to outsiders or members of the organization to cast another vote and rig it. 
+so when the particular member uses the token no other member can use it to vote.
+
+4. Election organizers should be able to select the member who are eligible to vote after they have imported the excel file or manually
+typed the details of the members
+
+5. No administration or human should have access to who is leading in any of the elections. 
+Not even organizers after creating and publishing the election.
+
+
+6. Election organizers should be able to choose whether they are organizing multiple election events. And if they
+are organizing multiple election events, the people voting should be able to participate in all voting one after 
+the other in a single page slide fashion and when they finish, the can preview their choices and then submit to cast their vote.
+
+7. After a successful election, the members of the organization should receive email and sms notification about the results
+of the election with a link to view the results.
+
+REMOVE THESE FEATURES:
+1. Remove the "Bulk candidate import feature at the create-election page.
+2. Advanced setup form at the create-election page.
+
+NOTE: If a feature described here is available and works perfectly, ignore. And if the features I have asked you
+to remove can be modified into a beneficial purpose, ask for me permission to modify and explain why it could help
+in a real use case.
+
+
+
