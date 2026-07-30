@@ -93,6 +93,40 @@ export default function ElectionDetail() {
   const { data: election, isLoading } = useGetElection(electionId) as { data: Election | undefined; isLoading: boolean };
   const { data: myVote } = useGetMyVote(electionId);
 
+  const candidates = election?.candidates ?? [];
+  const myRole = election?.myRole ?? "voter";
+  const isAdmin = myRole === "admin";
+  const isOfficer = ["admin", "officer"].includes(myRole);
+  const hasEnoughCandidates = candidates.length >= 2;
+  const hasVoted = !!(myVote as { hasVoted?: boolean })?.hasVoted || !!voteSuccess;
+  const isActive = election?.status === "active";
+  const isDraft = election?.status === "draft";
+  const isClosed = election?.status === "closed";
+  const isUpcoming = isActive && election ? now < new Date(election.startTime).getTime() : false;
+  const isExpired = isActive && election ? now > new Date(election.endTime).getTime() : false;
+  const maxChoices = election
+    ? election.type === "single" || election.type === "yesno"
+      ? 1
+      : election.maxChoices ?? 1
+    : 1;
+
+  const pollSlides = useMemo<PollSlide[]>(() => {
+    if (!candidates.length) return [];
+    return [
+      {
+        id: 1,
+        title: "Main ballot",
+        description: "Select your preferred option for this election.",
+        options: candidates.map((candidate) => ({
+          id: candidate.id,
+          name: candidate.name,
+          description: candidate.description ?? undefined,
+          imageUrl: undefined,
+        })),
+      },
+    ];
+  }, [candidates]);
+
   const castVoteMutation = useCastVote({
     mutation: {
       onSuccess(data) {
@@ -142,35 +176,6 @@ export default function ElectionDetail() {
       </div>
     );
   }
-
-  const candidates = election.candidates ?? [];
-  const myRole = election.myRole ?? "voter";
-  const isAdmin = myRole === "admin";
-  const isOfficer = ["admin", "officer"].includes(myRole);
-  const hasVoted = !!(myVote as { hasVoted?: boolean })?.hasVoted || !!voteSuccess;
-  const isActive = election.status === "active";
-  const isDraft = election.status === "draft";
-  const isClosed = election.status === "closed";
-  const isUpcoming = isActive && now < new Date(election.startTime).getTime();
-  const isExpired = isActive && now > new Date(election.endTime).getTime();
-  const maxChoices = election.type === "single" || election.type === "yesno" ? 1 : (election.maxChoices ?? 1);
-
-  const pollSlides = useMemo<PollSlide[]>(() => {
-    if (!candidates.length) return [];
-    return [
-      {
-        id: 1,
-        title: "Main ballot",
-        description: "Select your preferred option for this election.",
-        options: candidates.map((candidate) => ({
-          id: candidate.id,
-          name: candidate.name,
-          description: candidate.description ?? undefined,
-          imageUrl: undefined,
-        })),
-      },
-    ];
-  }, [candidates]);
 
   function toggleCandidate(cid: number) {
     if (hasVoted || !isActive) return;
@@ -263,11 +268,11 @@ export default function ElectionDetail() {
                     This election is in draft mode. Publish it to allow members to vote.
                     {candidates.length < 2 && " Add at least 2 candidates before publishing."}
                   </p>
-                  {isAdmin && (
+                  {isOfficer && (
                     <Button
                       size="sm"
                       className="bg-amber-600 hover:bg-amber-700 text-white"
-                      disabled={candidates.length < 2 || publishMutation.isPending}
+                      disabled={!hasEnoughCandidates || publishMutation.isPending}
                       onClick={() => publishMutation.mutate({ id: electionId })}
                     >
                       {publishMutation.isPending ? "Publishing…" : "Publish election"}

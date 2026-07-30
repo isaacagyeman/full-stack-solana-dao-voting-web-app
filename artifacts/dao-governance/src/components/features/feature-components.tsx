@@ -84,15 +84,22 @@ interface CandidateImageUploadProps {
 export function CandidateImageUpload({ value, onChange, label = "Candidate image" }: CandidateImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(value ?? null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setFileError("Image must be smaller than 5MB.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       setPreview(result);
-      onChange(result);
+      setFileError(null);
+      // File uploads are preview-only here, so do not persist base64 data.
+      onChange("");
     };
     reader.readAsDataURL(file);
   }
@@ -115,11 +122,13 @@ export function CandidateImageUpload({ value, onChange, label = "Candidate image
           onChange(e.target.value);
         }}
       />
+      {fileError && <p className="text-xs text-red-600">{fileError}</p>}
       {preview && (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           <img src={preview} alt="Preview" className="h-20 w-full object-cover" />
         </div>
       )}
+      <p className="text-xs text-slate-500">File uploads are preview-only here; paste a URL to include the image in the election payload.</p>
     </div>
   );
 }

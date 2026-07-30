@@ -122,6 +122,10 @@ export default function CreateElection() {
     setImportErrors([]);
   }
 
+  function isDataUrl(value: string | undefined): boolean {
+    return typeof value === "string" && /^data:[^;]+;base64,/.test(value);
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -136,10 +140,10 @@ export default function CreateElection() {
         type,
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
-        candidateList: validCandidates.map((c) => ({
+        candidates: validCandidates.map((c) => ({
           name: c.name,
           description: c.description || undefined,
-          imageUrl: c.imageUrl || undefined,
+          imageUrl: !isDataUrl(c.imageUrl) ? c.imageUrl || undefined : undefined,
         })),
       } as never,
     });

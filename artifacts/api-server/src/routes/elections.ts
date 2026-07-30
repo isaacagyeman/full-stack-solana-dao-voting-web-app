@@ -93,6 +93,7 @@ router.post("/elections", requireAuth, async (req, res) => {
     maxChoices,
     quorum,
     candidateList,
+    candidates: candidateInput,
   } = req.body as {
     orgId?: number;
     title?: string;
@@ -103,7 +104,8 @@ router.post("/elections", requireAuth, async (req, res) => {
     isPublic?: boolean;
     maxChoices?: number;
     quorum?: number;
-    candidateList?: Array<{ name: string; description?: string }>;
+    candidateList?: Array<{ name: string; description?: string; imageUrl?: string }>;
+    candidates?: Array<{ name: string; description?: string; imageUrl?: string }>;
   };
   if (!orgId || !title || !startTime || !endTime) {
     res.status(400).json({ error: "orgId, title, startTime, and endTime are required" });
@@ -137,16 +139,38 @@ router.post("/elections", requireAuth, async (req, res) => {
       quorum: quorum ?? 0,
     })
     .returning();
-  if (candidateList && candidateList.length > 0) {
-    await db.insert(candidates).values(
-      candidateList.map((c, i) => ({
-        electionId: election.id,
-        name: c.name,
-        description: c.description,
-        displayOrder: i,
-      })),
-    );
+  const incomingCandidates = (candidateList ?? candidateInput ?? []) as Array<{
+    name: string;
+    description?: string;
+    imageUrl?: string;
+  }>;
+
+  const sanitizedCandidates = incomingCandidates
+    .map((candidate) => ({
+      name: candidate.name?.trim() ?? "",
+      description: candidate.description?.trim() ?? undefined,
+      imageUrl:
+        typeof candidate.imageUrl === "string" && candidate.imageUrl.startsWith("data:")
+          ? undefined
+          : candidate.imageUrl,
+    }))
+    .filter((candidate) => candidate.name.length > 0);
+
+  if (sanitizedCandidates.length < 2) {
+    res.status(400).json({ error: "At least 2 candidates are required" });
+    return;
   }
+
+  await db.insert(candidates).values(
+    sanitizedCandidates.map((c, i) => ({
+      electionId: election.id,
+      name: c.name,
+      description: c.description,
+      imageUrl: c.imageUrl,
+      displayOrder: i,
+    })),
+  );
+
   res.status(201).json(election);
 });
 
@@ -508,8 +532,8 @@ router.post("/elections/:id/publish", requireAuth, async (req, res) => {
     .select()
     .from(orgMembers)
     .where(and(eq(orgMembers.orgId, election.orgId), eq(orgMembers.userId, uid)));
-  if (!myMembership || myMembership.role !== "admin") {
-    res.status(403).json({ error: "Admin access required" });
+  if (!myMembership || !["admin", "officer"].includes(myMembership.role)) {
+    res.status(403).json({ error: "Admin or officer access required" });
     return;
   }
   const candidateList = await db
@@ -614,7 +638,7 @@ router.post("/elections/:id/send-notifications", requireAuth, async (req, res) =
         // Send notification
         await NotificationService.send({
           recipientEmail: userData.email,
-          recipientPhone: userData.phone,
+          recipientPhone: userData.phone ?? undefined,
           recipientName: userData.name,
           channel,
           electionName: election.title,
